@@ -1,0 +1,6 @@
+services:
+  gameroombookingsys:
+    image: ${DOCKER_REGISTRY-}gameroombookingsys
+    build:
+      context: .
+      dockerfile: Server/Dockerfile
