@@ -17,16 +17,18 @@ using gameroombookingsys.IService;
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var pgConnectionString = builder.Configuration.GetConnectionString("PostgresConnection");
 
 var allowFrontEndCors = "AllowFrontend";
 var apiTitle = "Game Room Booking API"; 
 var apiVersion = "v1";  
 var frontEndUrl = "http://localhost:5173";
 
-// Setup Database Context
+// Use PostgreSQL only
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+{
+    options.UseNpgsql(pgConnectionString);
+});
 
 // Repository & service registration
 builder.Services.AddScoped<IPlayersRepository, PlayersRepository>();
@@ -100,28 +102,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = key,
             ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 }
         };
-
-        // Uncomment to add logging for JWT events
-        //options.Events = new JwtBearerEvents
-        //{
-        //    OnAuthenticationFailed = context =>
-        //    {
-        //        var logger = context.HttpContext.RequestServices
-        //            .GetRequiredService<ILoggerFactory>()
-        //            .CreateLogger("JwtBearer");
-        //        logger.LogError(context.Exception, "JWT Authentication failed!");
-        //        return Task.CompletedTask;
-        //    },
-        //    OnTokenValidated = context =>
-        //    {
-        //        var logger = context.HttpContext.RequestServices
-        //            .GetRequiredService<ILoggerFactory>()
-        //            .CreateLogger("JwtBearer");
-        //        logger.LogInformation("Token validated. Claims: {Claims}",
-        //            string.Join(", ", context.Principal.Claims.Select(c => $"{c.Type}={c.Value}")));
-        //        return Task.CompletedTask;
-        //    }
-        //};
     });
 
 builder.Services.AddAuthorization();

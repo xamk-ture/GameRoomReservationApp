@@ -19,12 +19,13 @@ namespace gameroombookingsys
 
             modelBuilder.Entity<RoomBooking>(entity =>
             {
+                // PostgreSQL: map datetime to timestamp without time zone
                 entity.Property(e => e.BookingDateTime)
-               .HasColumnType("datetime2");
+                    .HasColumnType("timestamp without time zone");
 
-                // Update Duration column to be a float (SQL Server float corresponds to a C# double)
+                // PostgreSQL float8 = double precision
                 entity.Property(e => e.Duration)
-                    .HasColumnType("float");
+                    .HasColumnType("double precision");
             });
 
             modelBuilder.Entity<RoomBooking>()
