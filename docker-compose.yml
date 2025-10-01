@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres
+    container_name: gameroom-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: gameroomdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+
+  gameroombookingsys:
+    image: ${DOCKER_REGISTRY-}gameroombookingsys
+    build:
+      context: .
+      dockerfile: Server/Dockerfile
+    ports:
+      - "8080"
+      - "8081"
+    depends_on:
+      - postgres
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - "ConnectionStrings__PostgresConnection=Host=postgres;Port=5432;Database=gameroomdb;Username=user;Password=password"
+      - ASPNETCORE_URLS=http://+:8080;https://+:8081
+
+  client:
+    image: node:18-alpine
+    working_dir: /app
+    depends_on:
+      - gameroombookingsys
+    environment:
+      - VITE_PROXY_TARGET=http://gameroombookingsys:8080
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm ci || npm install && npm run dev -- --host --port 5173"
+
+volumes:
+  postgres_data:
