@@ -12,6 +12,7 @@ namespace gameroombookingsys
         public DbSet<Player> Players { get; set; }
         public DbSet<Device> Devices { get; set; }
         public DbSet<RoomBooking> RoomBookings { get; set; }
+        public DbSet<OneTimeLoginCode> OneTimeLoginCodes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -54,6 +55,14 @@ namespace gameroombookingsys
                         .HasConstraintName("FK_DeviceRoomBooking_RoomBookings_RoomBookingId")
                         .OnDelete(DeleteBehavior.Cascade) 
                 );
+
+            modelBuilder.Entity<OneTimeLoginCode>(entity =>
+            {
+                entity.HasIndex(e => e.Email);
+                entity.Property(e => e.Email).IsRequired();
+                entity.Property(e => e.Code).IsRequired();
+                entity.Property(e => e.ExpiresAt).HasColumnType("timestamp with time zone");
+            });
         }
     }
 }

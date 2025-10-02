@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using gameroombookingsys.IService;
+using Npgsql;
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 var builder = WebApplication.CreateBuilder(args);
@@ -107,6 +108,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Ensure database is created and migrations are applied at startup
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+
+    try
+    {
+        // Log which DB we target (without secrets)
+        var csb = new NpgsqlConnectionStringBuilder(pgConnectionString);
+        logger.LogInformation("Using PostgreSQL Host={Host} Port={Port} Database={Database} Username={Username}", csb.Host, csb.Port, csb.Database, csb.Username);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var pending = db.Database.GetPendingMigrations().ToList();
+        if (pending.Count > 0)
+        {
+            logger.LogInformation("Applying {Count} pending EF migrations: {Migrations}", pending.Count, string.Join(", ", pending));
+        }
+        else
+        {
+            logger.LogInformation("No pending EF migrations.");
+        }
+
+        db.Database.Migrate();
+
+        var applied = db.Database.GetAppliedMigrations().ToList();
+        logger.LogInformation("Applied migrations count: {Count}", applied.Count);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Database migration on startup failed");
+        throw; // Fail fast so we don't run with a mismatched schema
+    }
+}
 
 // Apply Middleware
 app.UseCors(allowFrontEndCors);
