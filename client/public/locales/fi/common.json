@@ -1,4 +1,17 @@
 {
   "Language": "Kieli",
-  "Settings": "Asetukset"
+  "Settings": "Asetukset",
+  "login.title": "Kirjaudu sisään",
+  "login.emailLabel": "Syötä sähköpostisi (vain @edu.xamk.fi / @xamk.fi)",
+  "login.sendCode": "Lähetä kertakäyttökoodi",
+  "login.sending": "Lähetetään...",
+  "login.codeLabel": "Syötä kertakäyttökoodi",
+  "login.verify": "Vahvista ja kirjaudu",
+  "login.verifying": "Vahvistetaan...",
+  "login.back": "Takaisin",
+  "errors.onlySchoolEmails": "Vain Xamkin sähköpostit ovat sallittuja.",
+  "errors.generic": "Jokin meni pieleen. Yritä uudelleen.",
+  "notify.codeSent": "Kertakäyttökoodi lähetetty sähköpostiisi.",
+  "notify.sendFailed": "Koodin lähetys epäonnistui",
+  "notify.verifyFailed": "Koodin vahvistus epäonnistui"
 }

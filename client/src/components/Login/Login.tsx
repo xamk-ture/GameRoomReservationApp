@@ -8,20 +8,24 @@ import {
   Button,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../api/api";
 import { OpenAPI } from "../../api/core/OpenAPI";
 import { PlayerDto } from "../../api/api";
 import gameRoomImage from "../../assets/gameroomimage.svg";
-import RegistrationModal from "./RegistrationModal";
 import { enqueueSnackbar } from "notistack";
+import { useTranslation } from "react-i18next";
 import AppTitleColored from "../../assets/APP-TITLE-COLORED.svg";
+import LanguagePicker from "../LanguagePicker";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [playerDto, setPlayerDto] = useState<PlayerDto>({});
   const [error, setError] = useState<string | null>(null);
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState("");
 
   //Handle email changes
   const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,106 +36,171 @@ const Login: React.FC = () => {
     }));
   };
 
-  // Handle login action
-  const handleLogin = async () => {
-    // Validate email domain
-    if (!playerDto.email?.endsWith("@edu.xamk.fi")) {
-      setError("Only university emails are allowed.");
+  // Lähetä kertakäyttökoodi sähköpostiin
+  const handleSendCode = async () => {
+    setError(null);
+    const email = playerDto.email?.trim() || "";
+    if (!email || (!email.endsWith("@edu.xamk.fi") && !email.endsWith("@xamk.fi"))) {
+      setError(t("errors.onlySchoolEmails"));
       return;
     }
-
+    setIsSending(true);
     try {
-      // Call your token generation endpoint
-      const token = await api.TokenService.getApiTokenGenerate(
-        playerDto.email || ""
-      );
-      localStorage.setItem("jwtToken", token);
-
-      // Attach token to subsequent requests
-      OpenAPI.HEADERS = {
-        Authorization: `Bearer ${token}`,
-      };
-
-      // Navigate to the profile page
-      navigate("/profile");
-    } catch (err: any) {
-      setError(err.message || "Error generating token");
-    }
-  };
-
-  const handleRegisterSend = async (email: string) => {
-    try {
-      await api.RegistrationService.sendRegistrationLink({ email });
-      enqueueSnackbar(`Registration link sent to ${email}`, {
-        variant: "success",
+      const base = OpenAPI.BASE || "";
+      // eslint-disable-next-line no-console
+      if (import.meta.env.DEV) console.log("[DEV] POST", `${base}/api/auth/request-code`);
+      const resp = await fetch(`${base}/api/auth/request-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
+      // eslint-disable-next-line no-console
+      if (import.meta.env.DEV) console.log("[DEV] request-code status:", resp.status);
+      if (!resp.ok) {
+        throw new Error("Koodin lähetys epäonnistui");
+      }
+
+      // Try to read debug header (server may expose it for dev)
+      const debugHeader = resp.headers.get("X-Debug-OneTime-Code");
+      if (import.meta.env.DEV && debugHeader) {
+        // eslint-disable-next-line no-console
+        console.log("[DEV] One-time login code (header):", debugHeader);
+      }
+
+      // Parse response to get code in development
+      try {
+        const data = await resp.json();
+        if (import.meta.env.DEV && data?.code) {
+          // eslint-disable-next-line no-console
+          console.log("[DEV] One-time login code (body):", data.code);
+        }
+      } catch {
+        // ignore json parse errors
+      }
+
+      setCodeSent(true);
+      enqueueSnackbar(t("notify.codeSent"), { variant: "success" });
     } catch (e: any) {
-      console.error("Error sending registration link:", e);
-      enqueueSnackbar(e?.message || "Error sending registration link", {
-        variant: "error",
-      });
+      setError(t("errors.generic"));
+      enqueueSnackbar(t("notify.sendFailed"), { variant: "error" });
+    } finally {
+      setIsSending(false);
     }
   };
+
+  // Vahvista koodi ja kirjaudu sisään
+  const handleVerifyCode = async () => {
+    setError(null);
+    const email = playerDto.email?.trim() || "";
+    if (!email || !code.trim()) {
+      setError(t("errors.generic"));
+      return;
+    }
+    setIsVerifying(true);
+    try {
+      const base = OpenAPI.BASE || "";
+      const resp = await fetch(`${base}/api/auth/verify-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: code.trim() }),
+      });
+      if (!resp.ok) throw new Error();
+      const data = await resp.json();
+      const token = data?.token;
+      if (!token) throw new Error();
+      localStorage.setItem("jwtToken", token);
+      OpenAPI.HEADERS = { Authorization: `Bearer ${token}` };
+      navigate("/profile");
+    } catch (e: any) {
+      setError(t("errors.generic"));
+      enqueueSnackbar(t("notify.verifyFailed"), { variant: "error" });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Ei rekisteröintiä tässä projektissa
 
   return (
     <Box sx={styles.background}>
+      <Box sx={styles.langPicker}>
+        <LanguagePicker />
+      </Box>
       <Container maxWidth="sm">
         <Paper sx={styles.paper}>
           <Box sx={styles.titleAndLogo}>
             <Typography variant="h5" sx={styles.title}>
-              Log in to
+              {t("login.title")}
             </Typography>
             <img src={AppTitleColored} alt="X Game Room" width={200} />
           </Box>
 
           <TextField
-            label="Enter your email (university email only)"
+            label={t("login.emailLabel")}
             type="email"
             value={playerDto.email || ""}
             onChange={handleEmailChange}
             fullWidth
             margin="normal"
           />
-          {/* Password to be added later with keycloak authentication */}
-          <TextField
-            label="Enter your password"
-            type="password"
-            value={""}
-            onChange={() => {}}
-            fullWidth
-            margin="normal"
-          />
+
+          {codeSent && (
+            <TextField
+              label={t("login.codeLabel")}
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              fullWidth
+              margin="normal"
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+            />
+          )}
 
           {error && (
             <Typography color="error" variant="body1" sx={{ mt: 1 }}>
-              {"Error: " + error}
+              {error}
             </Typography>
           )}
 
-          {/* Login Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleLogin}
-            sx={{ mt: 2, width: "100%" }}
-          >
-            Login
-          </Button>
-
-          <Box sx={styles.linksRow}>
-            <Button onClick={() => setIsRegisterOpen(true)}>
-              register now
+          {!codeSent ? (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSendCode}
+              disabled={isSending}
+              sx={{ mt: 2, width: "100%" }}
+            >
+              {isSending ? t("login.sending") : t("login.sendCode")}
             </Button>
-            <Button>forgot password?</Button>
-          </Box>
+          ) : (
+            <>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleVerifyCode}
+                disabled={isVerifying || code.trim().length === 0}
+                sx={{ mt: 2, width: "100%" }}
+              >
+                {isVerifying ? t("login.verifying") : t("login.verify")}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => {
+                  setCode("");
+                  setCodeSent(false);
+                }}
+                sx={{ mt: 1, width: "100%" }}
+              >
+                {t("login.back")}
+              </Button>
+            </>
+          )}
+
+          {/* Links removed as per requirements */}
         </Paper>
       </Container>
-      {/* Registration Modal */}
-      <RegistrationModal
-        open={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
-        onSend={handleRegisterSend}
-      />
+      {/* Rekisteröintiä ei käytetä */}
     </Box>
   );
 };
@@ -149,6 +218,12 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+  },
+  langPicker: {
+    position: "fixed",
+    top: 8,
+    left: 8,
+    zIndex: 10,
   },
   paper: {
     p: 3,

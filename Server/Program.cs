@@ -23,7 +23,18 @@ var pgConnectionString = builder.Configuration.GetConnectionString("PostgresConn
 var allowFrontEndCors = "AllowFrontend";
 var apiTitle = "Game Room Booking API"; 
 var apiVersion = "v1";  
-var frontEndUrl = "http://localhost:5173";
+// Allow common dev origins
+var allowedOrigins = new[]
+{
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://localhost:5173",
+    "https://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "https://127.0.0.1:5173",
+    "https://127.0.0.1:5174"
+};
 
 // Use PostgreSQL only
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -73,9 +84,9 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(allowFrontEndCors, policy =>
     {
-        policy.WithOrigins(frontEndUrl)
-        .AllowAnyMethod()
-        .AllowAnyHeader();
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
 });
 
@@ -156,8 +167,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// In development / container running HTTP only, skip HTTPS redirection to avoid CORS breaks
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();

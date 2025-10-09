@@ -87,10 +87,24 @@ const LanguagePicker = () => {
           </li>
         )}
         renderInput={(params) => (
-          <TextField {...params} label={t("Language")} variant="standard" />
+          <TextField
+            {...params}
+            label={t("Language")}
+            variant="standard"
+            inputProps={{
+              ...params.inputProps,
+              readOnly: true,
+            }}
+            sx={{
+              "& .MuiInputBase-root": { cursor: "pointer" },
+              "& .MuiInputBase-input": { cursor: "pointer" },
+              cursor: "pointer",
+            }}
+          />
         )}
         clearOnEscape
         disableClearable
+        openOnFocus
         sx={{ width: 300 }}
       />
     </Stack>

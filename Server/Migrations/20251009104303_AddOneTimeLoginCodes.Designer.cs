@@ -12,8 +12,8 @@ using gameroombookingsys;
 namespace gameroombookingsys.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251002104641_AddOneTimeLoginCodesTable")]
-    partial class AddOneTimeLoginCodesTable
+    [Migration("20251009104303_AddOneTimeLoginCodes")]
+    partial class AddOneTimeLoginCodes
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
