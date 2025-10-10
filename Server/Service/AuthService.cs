@@ -2,18 +2,18 @@ using System.Security.Claims;
 using Gameroombookingsys.Models;
 using gameroombookingsys.Helpers;
 using gameroombookingsys.IService;
-using Microsoft.EntityFrameworkCore;
+using gameroombookingsys.IRepository;
 
 namespace gameroombookingsys.Service
 {
     public class AuthService : IAuthService
     {
-        private readonly AppDbContext _db;
+        private readonly IOneTimeLoginCodesRepository _codesRepository;
         private readonly ILogger<AuthService> _logger;
 
-        public AuthService(AppDbContext db, ILogger<AuthService> logger)
+        public AuthService(IOneTimeLoginCodesRepository codesRepository, ILogger<AuthService> logger)
         {
-            _db = db;
+            _codesRepository = codesRepository;
             _logger = logger;
         }
 
@@ -28,13 +28,9 @@ namespace gameroombookingsys.Service
             var code = Random.Shared.Next(0, 1_000_000).ToString("D6");
             var expiresAt = DateTime.UtcNow.AddMinutes(10);
 
-            var existing = await _db.OneTimeLoginCodes.Where(x => x.Email == email).ToListAsync();
-            if (existing.Count > 0)
-            {
-                _db.OneTimeLoginCodes.RemoveRange(existing);
-            }
+            await _codesRepository.RemoveExistingCodesForEmail(email);
 
-            _db.OneTimeLoginCodes.Add(new OneTimeLoginCode
+            await _codesRepository.Add(new OneTimeLoginCode
             {
                 Email = email,
                 Code = code,
@@ -42,30 +38,24 @@ namespace gameroombookingsys.Service
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
-            await _db.SaveChangesAsync();
 
             return (email, code, expiresAt);
         }
 
         public async Task<string> VerifyCodeAndIssueTokenAsync(string email, string code)
         {
-            var record = await _db.OneTimeLoginCodes
-                .Where(x => x.Email == email && x.Code == code)
-                .OrderByDescending(x => x.CreatedAt)
-                .FirstOrDefaultAsync();
+            var record = await _codesRepository.GetLatest(email, code);
 
             if (record == null)
                 throw new UnauthorizedAccessException("Invalid code.");
 
             if (record.ExpiresAt < DateTime.UtcNow)
             {
-                _db.OneTimeLoginCodes.Remove(record);
-                await _db.SaveChangesAsync();
+                await _codesRepository.Remove(record);
                 throw new UnauthorizedAccessException("Code expired.");
             }
 
-            _db.OneTimeLoginCodes.Remove(record);
-            await _db.SaveChangesAsync();
+            await _codesRepository.Remove(record);
 
             var claims = new[] { new Claim("email", email) };
             var token = JwtTokenGenerator.CreateJwt(claims, DateTime.UtcNow.AddHours(1));
@@ -74,14 +64,7 @@ namespace gameroombookingsys.Service
 
         public async Task<int> CleanupExpiredAsync()
         {
-            var now = DateTime.UtcNow;
-            var expired = await _db.OneTimeLoginCodes.Where(x => x.ExpiresAt < now).ToListAsync();
-            if (expired.Count > 0)
-            {
-                _db.OneTimeLoginCodes.RemoveRange(expired);
-                await _db.SaveChangesAsync();
-            }
-            return expired.Count;
+            return await _codesRepository.RemoveExpired(DateTime.UtcNow);
         }
     }
 }

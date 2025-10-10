@@ -49,6 +49,8 @@ builder.Services.AddScoped<IRoomBookingsRepository, RoomBookingsRepository>();
 builder.Services.AddScoped<IRoomBookingsService, RoomBookingsService>();
 builder.Services.AddScoped<IDevicesRepository, DevicesRepository>();
 builder.Services.AddScoped<IDevicesService, DevicesService>();
+builder.Services.AddScoped<IOneTimeLoginCodesRepository, OneTimeLoginCodesRepository>();
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<KeycloakHelper>();
 builder.Services.AddScoped<IEmailService, EmailService>();
