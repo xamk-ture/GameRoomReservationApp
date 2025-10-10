@@ -1,5 +1,4 @@
-﻿using gameroombookingsys.DTOs;
-using Gameroombookingsys.Models;
+﻿using Gameroombookingsys.Models;
 
 namespace gameroombookingsys.IRepository
 {

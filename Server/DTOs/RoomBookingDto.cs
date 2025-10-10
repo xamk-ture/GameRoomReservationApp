@@ -4,14 +4,16 @@ using System;
 
 namespace gameroombookingsys.DTOs
 {
-    public class RoomBookingDto : BaseEntity
+    public class RoomBookingDto
     {
         // Parameterless constructor for deserialization
         public RoomBookingDto() { }
 
-         public RoomBookingDto(RoomBooking roomBooking)
+        public RoomBookingDto(RoomBooking roomBooking)
         {
             Id = roomBooking.Id;
+            CreatedAt = roomBooking.CreatedAt;
+            UpdatedAt = roomBooking.UpdatedAt;
             BookingDateTime = roomBooking.BookingDateTime;
             Duration = roomBooking.Duration;
             Devices = roomBooking.Devices?.Select(d => new DeviceDto(d)).ToList();
@@ -23,6 +25,9 @@ namespace gameroombookingsys.DTOs
             IsPassCodeValid = roomBooking.IsPassCodeValid;
         }
 
+        public int Id { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
         public DateTime BookingDateTime { get; set; }
         public double Duration { get; set; }
         public List<DeviceDto> Devices { get; set; } = new List<DeviceDto>();
