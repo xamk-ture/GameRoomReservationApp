@@ -73,6 +73,21 @@ namespace gameroombookingsys
                 entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
                 entity.Property(e => e.LastLoginAt).HasColumnType("timestamp with time zone");
             });
+
+            // Enforce unique Player.Email and 1-1 relation to Users.Email
+            modelBuilder.Entity<Player>(entity =>
+            {
+                entity.Property(p => p.Email).IsRequired();
+                entity.HasIndex(p => p.Email).IsUnique();
+
+                entity
+                    .HasOne<AuthUser>()
+                    .WithOne()
+                    .HasForeignKey<Player>(p => p.Email)
+                    .HasPrincipalKey<AuthUser>(u => u.Email)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName("FK_Players_Users_Email");
+            });
         }
     }
 }
