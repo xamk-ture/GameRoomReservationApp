@@ -19,6 +19,9 @@ namespace gameroombookingsys
         {
             base.OnModelCreating(modelBuilder);
 
+            // Apply IEntityTypeConfiguration<> from this assembly
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
             modelBuilder.Entity<RoomBooking>(entity =>
             {
                 // PostgreSQL: map datetime to timestamp without time zone
@@ -63,30 +66,6 @@ namespace gameroombookingsys
                 entity.Property(e => e.Email).IsRequired();
                 entity.Property(e => e.Code).IsRequired();
                 entity.Property(e => e.ExpiresAt).HasColumnType("timestamp with time zone");
-            });
-            
-            modelBuilder.Entity<AuthUser>(entity =>
-            {
-                entity.ToTable("Users");
-                entity.HasKey(e => e.Email);
-                entity.Property(e => e.Email).IsRequired();
-                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
-                entity.Property(e => e.LastLoginAt).HasColumnType("timestamp with time zone");
-            });
-
-            // Enforce unique Player.Email and 1-1 relation to Users.Email
-            modelBuilder.Entity<Player>(entity =>
-            {
-                entity.Property(p => p.Email).IsRequired();
-                entity.HasIndex(p => p.Email).IsUnique();
-
-                entity
-                    .HasOne<AuthUser>()
-                    .WithOne()
-                    .HasForeignKey<Player>(p => p.Email)
-                    .HasPrincipalKey<AuthUser>(u => u.Email)
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("FK_Players_Users_Email");
             });
         }
     }
