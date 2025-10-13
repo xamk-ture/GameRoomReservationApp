@@ -10,6 +10,8 @@
     <DockerServiceName>gameroombookingsys</DockerServiceName>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="client\src\api\models\DeviceAvailabilityDto.ts" />
+    <None Include="client\src\api\models\DeviceAvailabilityDto.tsx" />
     <None Include="docker-compose.override.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>

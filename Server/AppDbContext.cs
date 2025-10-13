@@ -13,6 +13,7 @@ namespace gameroombookingsys
         public DbSet<Device> Devices { get; set; }
         public DbSet<RoomBooking> RoomBookings { get; set; }
         public DbSet<OneTimeLoginCode> OneTimeLoginCodes { get; set; }
+        public DbSet<AuthUser> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -62,6 +63,15 @@ namespace gameroombookingsys
                 entity.Property(e => e.Email).IsRequired();
                 entity.Property(e => e.Code).IsRequired();
                 entity.Property(e => e.ExpiresAt).HasColumnType("timestamp with time zone");
+            });
+            
+            modelBuilder.Entity<AuthUser>(entity =>
+            {
+                entity.ToTable("Users");
+                entity.HasKey(e => e.Email);
+                entity.Property(e => e.Email).IsRequired();
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.LastLoginAt).HasColumnType("timestamp with time zone");
             });
         }
     }

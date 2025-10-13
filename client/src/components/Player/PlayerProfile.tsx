@@ -1,7 +1,7 @@
 import { Typography, Box, Button, TextField } from "@mui/material";
 import { usePlayerInfo } from "../../hooks/usePlayerInfo";
 import UnknownProfilePic from "../../assets/UnknownProfilePic.svg";
-import { api, PlayerDto } from "../../api/api";
+import { api } from "../../api/api";
 import { useContext, useEffect, useState } from "react";
 import { usePrompt } from "../../hooks/usePrompt";
 import { enqueueSnackbar } from "notistack";
@@ -11,28 +11,13 @@ const PlayerProfile = () => {
   const { setLoading } = useContext(LoaderContext);
   const { playerInfo, loading, setPlayerInfo } = usePlayerInfo();
 
-  const [originalPlayerInfo, setOriginalPlayerInfo] =
-    useState<PlayerDto | null>(null);
+  const [originalPlayerInfo, setOriginalPlayerInfo] = useState(playerInfo);
 
   useEffect(() => {
     if (playerInfo && !originalPlayerInfo) {
       setOriginalPlayerInfo(playerInfo);
     }
   }, [playerInfo, originalPlayerInfo]);
-
-  const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPlayerInfo({
-      ...playerInfo,
-      username: e.target.value,
-    });
-  };
-
-  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPlayerInfo({
-      ...playerInfo,
-      phoneNumber: e.target.value,
-    });
-  };
 
   const handleUpdatePlayerInfo = () => {
     if (playerInfo) {
@@ -49,10 +34,7 @@ const PlayerProfile = () => {
           enqueueSnackbar("Error updating player info", {
             variant: "error",
           });
-          console.error(
-            "Error updating player info. Please try again later.",
-            err
-          );
+          console.error("Error updating player info. Please try again later.", err);
         })
         .finally(() => {
           setLoading(false);
@@ -60,15 +42,9 @@ const PlayerProfile = () => {
     }
   };
 
-  const isChanged =
-    playerInfo?.username !== originalPlayerInfo?.username ||
-    playerInfo?.phoneNumber !== originalPlayerInfo?.phoneNumber ||
-    playerInfo?.pictureUrl !== originalPlayerInfo?.pictureUrl;
+  const isChanged = false; // No editable fields for now
 
-  usePrompt(
-    "You have unsaved changes. Are you sure you want to leave?",
-    isChanged
-  );
+  usePrompt("You have unsaved changes. Are you sure you want to leave?", isChanged);
 
   return (
     <>
@@ -82,20 +58,6 @@ const PlayerProfile = () => {
               value={loading ? "Loading..." : playerInfo?.email || ""}
               variant="standard"
               disabled
-            />
-            <TextField
-              id="outlined-helperText"
-              label="Username"
-              value={loading ? "Loading..." : playerInfo?.username || ""}
-              variant="standard"
-              onChange={handleUserNameChange}
-            />
-            <TextField
-              id="outlined-helperText"
-              label="Phone number"
-              value={loading ? "Loading..." : playerInfo?.phoneNumber || ""}
-              variant="standard"
-              onChange={handlePhoneNumberChange}
             />
           </Box>
         </Box>
@@ -114,24 +76,10 @@ const PlayerProfile = () => {
               }
             }}
           />
-          <Box flex={1}>
-            <Button variant="text" sx={{ color: "#000", cursor: "pointer" }}>
-              <label
-                htmlFor="profile-pic-upload"
-                style={{ color: "#000", cursor: "inherit" }}
-              >
-                Edit image
-              </label>
-            </Button>
-          </Box>
         </Box>
       </Box>
       <Box sx={styles.formButtons}>
-        <Button
-          variant="contained"
-          onClick={handleUpdatePlayerInfo}
-          disabled={!isChanged}
-        >
+        <Button variant="contained" onClick={handleUpdatePlayerInfo} disabled={!isChanged}>
           Save
         </Button>
         <Button
@@ -167,23 +115,23 @@ const styles = {
   form: {
     gap: 3,
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "column" as const,
     width: "50%",
   },
   profilePicAndFormButtons: {
     display: "flex",
     justifyContent: "center",
-    flexDirection: "column",
+    flexDirection: "column" as const,
     alignItems: "center",
     gap: 1,
   },
   formButtons: {
     display: "flex",
     gap: 2,
-    position: "sticky",
+    position: "sticky" as const,
     zIndex: 1,
     bottom: 40,
     right: 120,
-    float: "right",
+    float: "right" as const,
   },
 };

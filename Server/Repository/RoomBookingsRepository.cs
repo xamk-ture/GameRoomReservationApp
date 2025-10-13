@@ -115,7 +115,9 @@ namespace gameroombookingsys.Repository
         {
             try
             {
-                return await _context.RoomBookings.ToListAsync();
+                return await _context.RoomBookings
+                    .Include(rb => rb.Devices)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {

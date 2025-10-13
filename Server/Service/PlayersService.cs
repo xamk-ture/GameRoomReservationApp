@@ -19,41 +19,27 @@ namespace Gameroombookingsys.Services
 
         public async Task<PlayerDto> GetPlayerByEmail(string email)
         {
-            // This check is optional if Keycloak already filters correctly.
-            if (!email.EndsWith("@edu.xamk.fi", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("Only school emails ending with '@edu.xamk.fi' are allowed.");
-            }
-
             var player = await _playerRepository.GetPlayerByEmail(email);
             if (player == null)
                 return null;
 
-            return new PlayerDto
-            {
-                Id = player.Id,
-                Username = player.Username,
-                PictureUrl = player.PictureUrl,
-                PhoneNumber = player.PhoneNumber,
-                Email = player.Email,
-                Theme = player.Theme
-            };
+            return new PlayerDto(player);
         }
-        public async Task<PlayerDto> GetPlayerByUsername(string username)
-        {
-            var player = await _playerRepository.GetPlayerByUsername(username);
-            if (player == null)
-                return null;
 
-            return new PlayerDto
+        public async Task<PlayerDto> GetOrCreatePlayerByEmail(string email)
+        {
+            var player = await _playerRepository.GetPlayerByEmail(email);
+            if (player == null)
             {
-                Id = player.Id,
-                Username = player.Username,
-                PictureUrl = player.PictureUrl,
-                PhoneNumber = player.PhoneNumber,
-                Email = player.Email,
-                Theme = player.Theme
-            };
+                player = await _playerRepository.AddPlayer(new Player
+                {
+                    Email = email,
+                    Theme = "light",
+                    PictureUrl = string.Empty,
+                });
+            }
+
+            return new PlayerDto(player);
         }
 
         public async Task<List<PlayerDto>> GetAllPlayers()
@@ -70,8 +56,6 @@ namespace Gameroombookingsys.Services
                     throw new KeyNotFoundException("Player not found.");
 
                 // Update fields
-                player.Username = playerDto.Username;
-                player.PhoneNumber = playerDto.PhoneNumber;
                 player.PictureUrl = playerDto.PictureUrl;
                 player.Theme = playerDto.Theme;
 
