@@ -1,4 +1,17 @@
 {
   "Language": "Language",
-  "Settings": "Settings"
+  "Settings": "Settings",
+  "login.title": "Sign in",
+  "login.emailLabel": "Enter your email (@edu.xamk.fi / @xamk.fi only)",
+  "login.sendCode": "Send one-time code",
+  "login.sending": "Sending...",
+  "login.codeLabel": "Enter the one-time code",
+  "login.verify": "Verify and sign in",
+  "login.verifying": "Verifying...",
+  "login.back": "Back",
+  "errors.onlySchoolEmails": "Only Xamk emails are allowed.",
+  "errors.generic": "Something went wrong. Try again.",
+  "notify.codeSent": "One-time code sent to your email.",
+  "notify.sendFailed": "Failed to send the code",
+  "notify.verifyFailed": "Failed to verify the code"
 }

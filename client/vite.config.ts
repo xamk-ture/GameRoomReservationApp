@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 // Use env var from compose, fallback to service name when running in Docker
 // and localhost when running locally.
-const proxyTarget = process.env.VITE_PROXY_TARGET || "http://localhost:5025";
+const proxyTarget = process.env.VITE_PROXY_TARGET || "http://localhost:8080";
 
 // https://vite.dev/config/
 export default defineConfig({

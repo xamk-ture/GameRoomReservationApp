@@ -45,13 +45,4 @@ namespace gameroombookingsys.Controllers
             }
         }
     }
-
-    public class RegistrationRequest
-    {
-        public string Email { get; set; }
-    } 
-    public class RegistrationResponse
-    {
-        public string Message { get; set; }
-    }
 }

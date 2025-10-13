@@ -20,6 +20,12 @@ function initApiHeadersFromStorage() {
   }
 }
 
+// Optionally set API base from env to avoid wrong host like "gameroombookingsys:xxxxx"
+const apiBase = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+if (apiBase && typeof apiBase === "string") {
+  OpenAPI.BASE = apiBase;
+}
+
 // Initialize API headers once at startup
 initApiHeadersFromStorage();
 
