@@ -34,7 +34,9 @@ namespace gameroombookingsys.Helpers
 
         public bool IsSchoolEmail(string email)
         {
-            return !string.IsNullOrEmpty(email) && email.EndsWith("@edu.xamk.fi", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(email)) return false;
+            return email.EndsWith("@edu.xamk.fi", StringComparison.OrdinalIgnoreCase)
+                || email.EndsWith("@xamk.fi", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

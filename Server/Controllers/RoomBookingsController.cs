@@ -155,11 +155,8 @@ namespace gameroombookingsys.Controllers
             try
             {
                 var bookings = await _roomBookingService.GetRoomBookingsByPlayerId(playerId);
-                 return Ok(bookings);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { Message = ex.Message });
+                // Return 200 OK with empty array instead of 404 when no bookings for the player
+                return Ok(bookings);
             }
             catch (Exception ex)
             {

@@ -9,11 +9,16 @@ namespace gameroombookingsys.Service
     public class AuthService : IAuthService
     {
         private readonly IOneTimeLoginCodesRepository _codesRepository;
+        private readonly IUsersRepository _usersRepository;
         private readonly ILogger<AuthService> _logger;
 
-        public AuthService(IOneTimeLoginCodesRepository codesRepository, ILogger<AuthService> logger)
+        public AuthService(
+            IOneTimeLoginCodesRepository codesRepository, 
+            IUsersRepository usersRepository, 
+            ILogger<AuthService> logger)
         {
             _codesRepository = codesRepository;
+            _usersRepository = usersRepository;
             _logger = logger;
         }
 
@@ -56,6 +61,17 @@ namespace gameroombookingsys.Service
             }
 
             await _codesRepository.Remove(record);
+            
+            // Upsert user in the database
+            try
+            {
+                await _usersRepository.UpsertUser(email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error upserting user during login: {Email}", email);
+                // Continue with token generation even if user upsert fails
+            }
 
             var claims = new[] { new Claim("email", email) };
             var token = JwtTokenGenerator.CreateJwt(claims, DateTime.UtcNow.AddHours(1));

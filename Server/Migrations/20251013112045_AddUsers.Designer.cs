@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using gameroombookingsys;
@@ -11,9 +12,11 @@ using gameroombookingsys;
 namespace gameroombookingsys.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251013112045_AddUsers")]
+    partial class AddUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35,22 +38,6 @@ namespace gameroombookingsys.Migrations
                     b.HasIndex("RoomBookingId");
 
                     b.ToTable("DeviceRoomBooking");
-                });
-
-            modelBuilder.Entity("Gameroombookingsys.Models.AuthUser", b =>
-                {
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Email");
-
-                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Gameroombookingsys.Models.Device", b =>
@@ -135,6 +122,10 @@ namespace gameroombookingsys.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("PictureUrl")
                         .IsRequired()
                         .HasColumnType("text");
@@ -146,10 +137,11 @@ namespace gameroombookingsys.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
+                    b.HasKey("Id");
 
                     b.ToTable("Players");
                 });
@@ -197,6 +189,22 @@ namespace gameroombookingsys.Migrations
                     b.ToTable("RoomBookings");
                 });
 
+            modelBuilder.Entity("Gameroombookingsys.Models.User", b =>
+                {
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Email");
+
+                    b.ToTable("Users");
+                });
+
             modelBuilder.Entity("DeviceRoomBooking", b =>
                 {
                     b.HasOne("Gameroombookingsys.Models.Device", null)
@@ -212,16 +220,6 @@ namespace gameroombookingsys.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_DeviceRoomBooking_RoomBookings_RoomBookingId");
-                });
-
-            modelBuilder.Entity("Gameroombookingsys.Models.Player", b =>
-                {
-                    b.HasOne("Gameroombookingsys.Models.AuthUser", null)
-                        .WithOne()
-                        .HasForeignKey("Gameroombookingsys.Models.Player", "Email")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_Players_Users_Email");
                 });
 
             modelBuilder.Entity("Gameroombookingsys.Models.RoomBooking", b =>

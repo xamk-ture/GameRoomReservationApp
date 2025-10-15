@@ -7,7 +7,7 @@ import { usePlayerInfo } from "../../hooks/usePlayerInfo";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 const Navigation = () => {
-  const { playerInfo, error } = usePlayerInfo();
+  const { error } = usePlayerInfo();
   const location = useLocation();
 
   const [focusedButton, setFocusedButton] = useState(location.pathname);
@@ -35,8 +35,7 @@ const Navigation = () => {
         ))}
       </Box>
       <Box sx={styles.userNameAndLogoutButton}>
-        <Typography sx={styles.username}>{playerInfo?.username}</Typography>
-
+        <span />
         <Link to="/">
           <IconButton sx={styles.logoutButton}>
             <LogoutIcon />
@@ -62,7 +61,7 @@ const styles = {
   },
   navButtons: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "column" as const,
     gap: 2,
     "& a": {
       textDecoration: "none",
@@ -75,7 +74,7 @@ const styles = {
     fontWeight: "bold",
   },
   userNameAndLogoutButton: {
-    position: "absolute",
+    position: "absolute" as const,
     bottom: 0,
     left: 0,
     padding: 2,
@@ -83,11 +82,6 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     width: "20%",
-  },
-  username: {
-    fontStyle: "italic",
-    fontSize: 16,
-    letterSpacing: 0.5,
   },
   logoutButton: {
     color: "black",

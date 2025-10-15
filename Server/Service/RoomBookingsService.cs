@@ -1,5 +1,4 @@
-﻿
-using gameroombookingsys.DTOs;
+﻿using gameroombookingsys.DTOs;
 using gameroombookingsys.Enums;
 using gameroombookingsys.Helpers;
 using gameroombookingsys.Interfaces;
@@ -45,7 +44,15 @@ namespace gameroombookingsys.Service
                 // Look up the player by email
                 var player = await _playersRepository.GetPlayerByEmail(email);
                 if (player == null)
-                    throw new Exception("Player not found for the authenticated user.");
+                {
+                    // Auto-create minimal Player record for first-time authenticated users
+                    player = await _playersRepository.AddPlayer(new Player
+                    {
+                        Email = email,
+                        Theme = "light",
+                        PictureUrl = string.Empty,
+                    });
+                }
 
                 // Ensure player's email is a university email
                 if (!_keycloakHelper.IsSchoolEmail(email))
@@ -99,19 +106,23 @@ namespace gameroombookingsys.Service
                     PassCode = GeneratePassCode(),
                 };
 
-                // Convert each DeviceDto -> Device and add to booking.Devices
+                // Link existing devices by Id (do NOT create new device rows)
                 if (dto.Devices != null && dto.Devices.Count > 0)
                 {
-                    foreach (var deviceDto in dto.Devices)
+                    // De-duplicate incoming device selections by Id
+                    var distinctIds = dto.Devices
+                        .Where(d => d != null && d.Id > 0)
+                        .Select(d => d.Id)
+                        .Distinct()
+                        .ToList();
+
+                    foreach (var deviceId in distinctIds)
                     {
-                        var device = new Device
+                        var device = await _deviceRepository.GetDeviceById(deviceId);
+                        if (device == null)
                         {
-                            Name = deviceDto.Name,
-                            Description = deviceDto.Description,
-                            Quantity = deviceDto.Quantity,
-                            Status = deviceDto.Status,
-                            PlayerId = deviceDto.PlayerId
-                        };
+                            throw new KeyNotFoundException($"Device with ID {deviceId} not found.");
+                        }
                         booking.Devices.Add(device);
                     }
                 }
@@ -375,22 +386,21 @@ namespace gameroombookingsys.Service
         {
             try
             {
-                // Retrieve the booking by player ID.
                 var bookings = await _repository.GetRoomBookingsByPlayerId(playerId);
-                 if (bookings == null || !bookings.Any())
-                    throw new KeyNotFoundException("No bookings found for the specified player.");
+                if (bookings == null || !bookings.Any())
+                {
+                    return new List<RoomBookingDto>();
+                }
 
-                    foreach (var b in bookings)
-                        {
-                        var currentPassCode = b.PassCode;
-                        UpdateBookingStatus(b);
-                        // Reassign the PassCode to preserve it
-                        b.PassCode = currentPassCode;
-                        await _repository.UpdateRoomBooking(b); 
-                        }
+                foreach (var b in bookings)
+                {
+                    var currentPassCode = b.PassCode;
+                    UpdateBookingStatus(b);
+                    b.PassCode = currentPassCode;
+                    await _repository.UpdateRoomBooking(b);
+                }
 
-                     // Map each updated entity to a DTO
-                      return bookings.Select(b => new RoomBookingDto(b)).ToList();
+                return bookings.Select(b => new RoomBookingDto(b)).ToList();
             }
             catch (Exception ex)
             {

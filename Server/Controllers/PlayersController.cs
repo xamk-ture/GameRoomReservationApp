@@ -51,40 +51,13 @@ public class PlayersController : ControllerBase
                 return Unauthorized("Only school emails ending with '@edu.xamk.fi' are allowed.");
             }
 
-            // Optionally, you could let the service check this too:
-            var playerDto = await _playerService.GetPlayerByEmail(email);
-            if (playerDto == null)
-            {
-                return NotFound("Player not found.");
-            }
-
+            // Auto-provision a player profile for first-time authenticated users
+            var playerDto = await _playerService.GetOrCreatePlayerByEmail(email);
             return Ok(playerDto);
         }
         catch (Exception ex)
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error fetching player info", error = ex.Message });
-        }
-    }
-
-    // GET api/players/byusername/{username}
-    [HttpGet("byusername/{username}")]
-    [ProducesResponseType(typeof(PlayerDto), StatusCodes.Status200OK)]
-    [SwaggerOperation(OperationId = "GetPlayerByUsername")]
-    public async Task<ActionResult<PlayerDto>> GetPlayerByUsername(string username)
-    {
-        try
-        {
-            var playerDto = await _playerService.GetPlayerByUsername(username);
-            if (playerDto == null)
-            {
-                return NotFound("Player not found.");
-            }
-            return Ok(playerDto);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                new { message = "Error fetching player by username", error = ex.Message });
         }
     }
 

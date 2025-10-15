@@ -13,10 +13,14 @@ namespace gameroombookingsys
         public DbSet<Device> Devices { get; set; }
         public DbSet<RoomBooking> RoomBookings { get; set; }
         public DbSet<OneTimeLoginCode> OneTimeLoginCodes { get; set; }
+        public DbSet<AuthUser> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Apply IEntityTypeConfiguration<> from this assembly
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
             modelBuilder.Entity<RoomBooking>(entity =>
             {

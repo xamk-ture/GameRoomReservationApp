@@ -33,7 +33,9 @@ var allowedOrigins = new[]
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "https://127.0.0.1:5173",
-    "https://127.0.0.1:5174"
+    "https://127.0.0.1:5174",
+    "http://localhost:8080",
+    "https://localhost:8080"
 };
 
 // Use PostgreSQL only
@@ -50,6 +52,7 @@ builder.Services.AddScoped<IRoomBookingsService, RoomBookingsService>();
 builder.Services.AddScoped<IDevicesRepository, DevicesRepository>();
 builder.Services.AddScoped<IDevicesService, DevicesService>();
 builder.Services.AddScoped<IOneTimeLoginCodesRepository, OneTimeLoginCodesRepository>();
+builder.Services.AddScoped<IUsersRepository, UsersRepository>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<KeycloakHelper>();

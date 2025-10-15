@@ -6,9 +6,7 @@ export type PlayerDto = {
     id?: number;
     createdAt?: string;
     updatedAt?: string;
-    username?: string | null;
     pictureUrl?: string | null;
-    phoneNumber?: string | null;
     email?: string | null;
     theme?: string | null;
 };

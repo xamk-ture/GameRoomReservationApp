@@ -131,6 +131,8 @@ const BookingForm = (props: BookingFormProps) => {
         <Autocomplete
           options={allDevices}
           getOptionLabel={(option) => option.name || ""}
+          isOptionEqualToValue={(option, value) => option.id === value.id}
+          filterSelectedOptions
           multiple
           value={
             mode === ModalMode.CREATE
@@ -141,7 +143,13 @@ const BookingForm = (props: BookingFormProps) => {
           onInputChange={(event, newInputValue) => {
             onInputChange(event, newInputValue);
           }}
-          onChange={onDeviceSelect}
+          onChange={(event, newValue) => {
+            // De-duplicate by id to avoid duplicates in value
+            const deduped = newValue.filter(
+              (v, idx, arr) => idx === arr.findIndex((x) => x.id === v.id)
+            );
+            onDeviceSelect(event, deduped);
+          }}
           renderTags={() => null}
           renderInput={(params) => (
             <TextField
@@ -155,9 +163,9 @@ const BookingForm = (props: BookingFormProps) => {
         />
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
           {booking.devices &&
-            booking.devices.map((device) => (
+            booking.devices.map((device, idx) => (
               <Chip
-                key={device.id}
+                key={`${device.id ?? device.name}-${idx}`}
                 label={device.name}
                 onDelete={
                   isDisabled
