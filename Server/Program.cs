@@ -34,7 +34,6 @@ var allowedOrigins = new[]
     "http://127.0.0.1:5174",
     "https://127.0.0.1:5173",
     "https://127.0.0.1:5174",
-    // Added 8080 for dev servers running on that port
     "http://localhost:8080",
     "https://localhost:8080"
 };
