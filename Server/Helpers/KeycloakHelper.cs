@@ -27,7 +27,7 @@ namespace gameroombookingsys.Helpers
 
             // Try different claim names:
             var emailClaim = user.Claims.FirstOrDefault(c => c.Type.Equals("email", StringComparison.OrdinalIgnoreCase))
-                             ?? user.Claims.FirstOrDefault(c => c.Type.Equals(ClaimTypes.Email, StringComparison.OrdinalIgnoreCase))
+                             ?? user.Claims.FirstOrDefault(c => c.Type.Equals(System.Security.Claims.ClaimTypes.Email, StringComparison.OrdinalIgnoreCase))
                              ?? user.Claims.FirstOrDefault(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress", StringComparison.OrdinalIgnoreCase));
             return emailClaim?.Value;
         }

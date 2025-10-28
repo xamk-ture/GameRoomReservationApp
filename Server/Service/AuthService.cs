@@ -12,14 +12,18 @@ namespace gameroombookingsys.Service
         private readonly IUsersRepository _usersRepository;
         private readonly ILogger<AuthService> _logger;
 
+        private readonly IConfiguration _configuration;
+
         public AuthService(
             IOneTimeLoginCodesRepository codesRepository, 
             IUsersRepository usersRepository, 
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IConfiguration configuration)
         {
             _codesRepository = codesRepository;
             _usersRepository = usersRepository;
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email)
@@ -73,7 +77,18 @@ namespace gameroombookingsys.Service
                 // Continue with token generation even if user upsert fails
             }
 
-            var claims = new[] { new Claim("email", email) };
+            var claims = new List<Claim> { new Claim("email", email) };
+
+            try
+            {
+                var allowedAdmins = _configuration.GetSection("Admin:AllowedEmails").Get<string[]>() ?? Array.Empty<string>();
+                if (allowedAdmins.Any(a => a.Equals(email, StringComparison.OrdinalIgnoreCase)))
+                {
+                    claims.Add(new Claim(System.Security.Claims.ClaimTypes.Role, "Admin"));
+                }
+            }
+            catch { }
+
             var token = JwtTokenGenerator.CreateJwt(claims, DateTime.UtcNow.AddHours(1));
             return token;
         }

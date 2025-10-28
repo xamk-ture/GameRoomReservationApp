@@ -32,13 +32,12 @@ services:
       - gameroombookingsys
     environment:
       - VITE_PROXY_TARGET=http://gameroombookingsys:8080
-      - VITE_API_BASE=http://localhost:8080
     volumes:
       - ./client:/app
       - /app/node_modules
     ports:
       - "127.0.0.1:5174:5173"
-    command: sh -c "npm ci || npm install && npm run dev -- --host --port 5173"
+    command: sh -c "npm ci --legacy-peer-deps || npm install --legacy-peer-deps && npm run dev -- --host --port 5173"
 
 volumes:
   postgres_data:

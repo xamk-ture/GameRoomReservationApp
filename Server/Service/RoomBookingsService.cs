@@ -50,7 +50,6 @@ namespace gameroombookingsys.Service
                     {
                         Email = email,
                         Theme = "light",
-                        PictureUrl = string.Empty,
                     });
                 }
 

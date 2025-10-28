@@ -1,1 +1,7 @@
-nyt selaimen console antaa virheilmoituksen ettei käyttäjää löydy. Tavoitteenamme on lisätä käyttäjän tallennus tietokantaan. Tietokantaan tallennetaan pelkästään sähköpostiosoite jota käyttäjä on käyttänyt kirjautuessaan sisään. Tulevaisuudessa kun käyttäjä pystyy varaamaan ajanvarauskalenterista tilan niin käyttäjän sähköpostiosoite liitetään varaukseen. Tee tarvittavat muutokset jotta tietokantaan tallentuu käyttäjä. Lisää tarvittavat muutokset jotta koodi mukailee nykyistä  architecture mallia.
+kalenteri ei näytä muitten käyttäjien varauksia
+= ei tiedä onko huone vapaana
+
+NEXT: Adminille oma näkymä kun kirjautuu.
+	-hallinnoi käyttäjiä
+		-laitteita
+		-varauksia
