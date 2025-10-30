@@ -82,7 +82,12 @@ namespace gameroombookingsys.Service
             try
             {
                 var allowedAdmins = _configuration.GetSection("Admin:AllowedEmails").Get<string[]>() ?? Array.Empty<string>();
-                if (allowedAdmins.Any(a => a.Equals(email, StringComparison.OrdinalIgnoreCase)))
+                var allowedPatterns = _configuration.GetSection("Admin:AllowedEmailPatterns").Get<string[]>() ?? Array.Empty<string>();
+
+                bool isExact = allowedAdmins.Any(a => a.Equals(email, StringComparison.OrdinalIgnoreCase));
+                bool matchesPattern = allowedPatterns.Any(p => IsEmailMatch(email, p));
+
+                if (isExact || matchesPattern)
                 {
                     claims.Add(new Claim(System.Security.Claims.ClaimTypes.Role, "Admin"));
                 }
@@ -96,6 +101,41 @@ namespace gameroombookingsys.Service
         public async Task<int> CleanupExpiredAsync()
         {
             return await _codesRepository.RemoveExpired(DateTime.UtcNow);
+        }
+
+        private static bool IsEmailMatch(string email, string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(pattern)) return false;
+            // Support simple '*' wildcard matching
+            // Examples: "admin*@edu.xamk.fi", "*@xamk.fi"
+            if (!pattern.Contains('*', StringComparison.Ordinal))
+            {
+                return string.Equals(email, pattern, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var parts = pattern.Split('*');
+            var remaining = email;
+            var first = true;
+            foreach (var part in parts)
+            {
+                if (part.Length == 0)
+                {
+                    continue;
+                }
+                var idx = remaining.IndexOf(part, first ? StringComparison.OrdinalIgnoreCase : StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) return false;
+                // Move past the matched segment
+                remaining = remaining.Substring(idx + part.Length);
+                first = false;
+            }
+            // If pattern ends with '*' then we allow remaining to have extra chars
+            // If pattern does not end with '*', ensure we matched the suffix at the end
+            if (!pattern.EndsWith("*", StringComparison.Ordinal))
+            {
+                // We must have consumed to end (i.e., last part matched at the end)
+                return remaining.Length == 0;
+            }
+            return true;
         }
     }
 }

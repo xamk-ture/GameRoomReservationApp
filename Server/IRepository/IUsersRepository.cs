@@ -6,5 +6,7 @@ namespace gameroombookingsys.IRepository
     {
         Task<AuthUser?> GetUserByEmail(string email);
         Task<AuthUser> UpsertUser(string email);
+        Task<List<AuthUser>> GetAllUsers();
+        Task<int> DeleteUsers(IEnumerable<string> emails);
     }
 }

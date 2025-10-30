@@ -10,6 +10,7 @@ import { SnackbarProvider } from "notistack";
 import { LoaderProvider } from "./context/LoaderProvider.tsx";
 import I18nProvider from "./i18n/context/I18nProvider.tsx";
 import { PlayerInfoProvider } from "./context/PlayerInfoProvider.tsx";
+import { AuthProvider } from "./context/AuthProvider";
 
 function initApiHeadersFromStorage() {
   const token = localStorage.getItem("jwtToken");
@@ -30,18 +31,20 @@ if (apiBase && typeof apiBase === "string") {
 initApiHeadersFromStorage();
 
 createRoot(document.getElementById("root")!).render(
-  <PlayerInfoProvider>
-    <I18nProvider>
-      <LoaderProvider>
-        <SnackbarProvider>
-          <ThemeProvider theme={appTheme}>
-            <CssBaseline />
-            <StrictMode>
-              <App />
-            </StrictMode>
-          </ThemeProvider>
-        </SnackbarProvider>
-      </LoaderProvider>
-    </I18nProvider>
-  </PlayerInfoProvider>
+  <AuthProvider>
+    <PlayerInfoProvider>
+      <I18nProvider>
+        <LoaderProvider>
+          <SnackbarProvider>
+            <ThemeProvider theme={appTheme}>
+              <CssBaseline />
+              <StrictMode>
+                <App />
+              </StrictMode>
+            </ThemeProvider>
+          </SnackbarProvider>
+        </LoaderProvider>
+      </I18nProvider>
+    </PlayerInfoProvider>
+  </AuthProvider>
 );

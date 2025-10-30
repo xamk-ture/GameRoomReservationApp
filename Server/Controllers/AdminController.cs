@@ -31,10 +31,8 @@ namespace gameroombookingsys.Controllers
         [SwaggerOperation(OperationId = "Admin_ListUsers")]
         public async Task<IActionResult> ListUsers()
         {
-            // Minimal: list all known auth users by email
-            // Using DbContext via repository FindAsync by keys is not suitable for list, so expose via context if needed.
-            // For now, return 501 until repository exposes list. Placeholder for UI integration.
-            return StatusCode(501, "Not implemented: expose Users list in repository");
+            var all = await _users.GetAllUsers();
+            return Ok(all);
         }
 
         [HttpGet("bookings")]
@@ -57,8 +55,22 @@ namespace gameroombookingsys.Controllers
         [SwaggerOperation(OperationId = "Admin_ListPlayers")]
         public async Task<IActionResult> ListPlayers()
         {
-            // IPlayersRepository doesn't expose list; return 501 until added.
-            return StatusCode(501, "Not implemented: expose Players list in repository");
+            var players = await _players.GetAllPlayers();
+            var dtos = players.Select(p => new gameroombookingsys.DTOs.PlayerDto(p)).ToList();
+            return Ok(dtos);
+        }
+
+        public class DeleteUsersRequest { public List<string> Emails { get; set; } = new(); }
+
+        [HttpDelete("users")]
+        [SwaggerOperation(OperationId = "Admin_DeleteUsers")]
+        public async Task<IActionResult> DeleteUsers([FromBody] DeleteUsersRequest request)
+        {
+            if (request == null || request.Emails == null || request.Emails.Count == 0)
+                return BadRequest(new { Message = "No emails provided." });
+
+            var deleted = await _users.DeleteUsers(request.Emails);
+            return Ok(new { Deleted = deleted });
         }
     }
 }

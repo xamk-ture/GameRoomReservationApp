@@ -1,12 +1,12 @@
 import { Box, Button, Typography, IconButton } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
-import { navButtons } from "./Data";
+import { adminNavButtons, navButtons } from "./Data";
 import { useState } from "react";
 import AppTitle from "../../assets/APP-TITLE.svg";
 import { usePlayerInfo } from "../../hooks/usePlayerInfo";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-const Navigation = () => {
+const Navigation = ({ isAdminMenu = false }: { isAdminMenu?: boolean }) => {
   const { error } = usePlayerInfo();
   const location = useLocation();
 
@@ -19,7 +19,7 @@ const Navigation = () => {
       </Box>
       {error && <Typography sx={styles.error}>Error: {error}</Typography>}
       <Box sx={styles.navButtons}>
-        {navButtons.map((button) => (
+        {(isAdminMenu ? adminNavButtons : navButtons).map((button) => (
           <Button
             key={button.label}
             variant="outlined"

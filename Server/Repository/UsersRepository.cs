@@ -48,5 +48,67 @@ namespace Gameroombookingsys.Repository
             await _context.SaveChangesAsync();
             return user;
         }
+
+        public async Task<List<AuthUser>> GetAllUsers()
+        {
+            return await _context.Users
+                .OrderByDescending(u => u.LastLoginAt)
+                .ToListAsync();
+        }
+
+        public async Task<int> DeleteUsers(IEnumerable<string> emails)
+        {
+            var list = (emails ?? Array.Empty<string>())
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Select(e => e.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (list.Count == 0) return 0;
+
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                using var tx = await _context.Database.BeginTransactionAsync();
+
+                // Find players by email
+                var players = await _context.Players
+                    .Where(p => list.Contains(p.Email))
+                    .ToListAsync();
+
+                if (players.Count > 0)
+                {
+                    var playerIds = players.Select(p => p.Id).ToList();
+
+                    // Delete bookings for these players
+                    var bookings = await _context.RoomBookings
+                        .Where(b => playerIds.Contains(b.PlayerId))
+                        .ToListAsync();
+                    if (bookings.Count > 0)
+                    {
+                        _context.RoomBookings.RemoveRange(bookings);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    // Delete players
+                    _context.Players.RemoveRange(players);
+                    await _context.SaveChangesAsync();
+                }
+
+                // Finally delete users
+                var users = await _context.Users
+                    .Where(u => list.Contains(u.Email))
+                    .ToListAsync();
+                if (users.Count == 0)
+                {
+                    await tx.CommitAsync();
+                    return 0;
+                }
+
+                _context.Users.RemoveRange(users);
+                var deleted = await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                return deleted;
+            });
+        }
     }
 }
