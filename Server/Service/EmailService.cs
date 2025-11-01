@@ -61,5 +61,16 @@ namespace gameroombookingsys.Helpers
 
             await SendBookingConfirmationEmailAsync(to, subject, body);
         }
+
+        /// <summary>
+        /// Sends a verification code email for login.
+        /// </summary>
+        public async Task SendVerificationCodeAsync(string to, string code)
+        {
+            string subject = "Your Login Verification Code";
+            string body = $"Your verification code is: {code}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this code, please ignore this email.";
+
+            await SendBookingConfirmationEmailAsync(to, subject, body);
+        }
     }
 }

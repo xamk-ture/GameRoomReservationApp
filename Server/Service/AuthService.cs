@@ -11,19 +11,21 @@ namespace gameroombookingsys.Service
         private readonly IOneTimeLoginCodesRepository _codesRepository;
         private readonly IUsersRepository _usersRepository;
         private readonly ILogger<AuthService> _logger;
-
+        private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
 
         public AuthService(
             IOneTimeLoginCodesRepository codesRepository, 
             IUsersRepository usersRepository, 
             ILogger<AuthService> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IEmailService emailService)
         {
             _codesRepository = codesRepository;
             _usersRepository = usersRepository;
             _logger = logger;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email)
@@ -47,6 +49,18 @@ namespace gameroombookingsys.Service
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            // Send verification code via email
+            try
+            {
+                await _emailService.SendVerificationCodeAsync(email, code);
+                _logger.LogInformation("Verification code sent to {Email}", email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send verification code email to {Email}", email);
+                // Continue even if email sending fails - code is still stored in database
+            }
 
             return (email, code, expiresAt);
         }
