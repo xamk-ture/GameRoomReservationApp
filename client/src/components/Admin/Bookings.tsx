@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api, DeviceDto, RoomBookingDto } from "../../api/api";
 import { OpenAPI } from "../../api/core/OpenAPI";
 import { useTranslation } from "react-i18next";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
 import dayjs from "dayjs";
+
+type SortOrder = "newest" | "oldest";
 
 const AdminBookings = () => {
   const [bookings, setBookings] = useState<RoomBookingDto[]>([]);
@@ -14,6 +16,7 @@ const AdminBookings = () => {
   const [snack, setSnack] = useState<string | null>(null);
   const [devices, setDevices] = useState<DeviceDto[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const { t } = useTranslation();
 
   const load = async () => {
@@ -119,11 +122,43 @@ const AdminBookings = () => {
     } catch { return ""; }
   };
 
+  const sortedBookings = useMemo(() => {
+    const sorted = [...bookings];
+    sorted.sort((a, b) => {
+      const dateA = dayjs(a.bookingDateTime as any);
+      const dateB = dayjs(b.bookingDateTime as any);
+      
+      if (!dateA.isValid() && !dateB.isValid()) return 0;
+      if (!dateA.isValid()) return 1;
+      if (!dateB.isValid()) return -1;
+      
+      if (sortOrder === "newest") {
+        return dateB.diff(dateA); // Uusimmat ensin
+      } else {
+        return dateA.diff(dateB); // Vanhimmat ensin
+      }
+    });
+    return sorted;
+  }, [bookings, sortOrder]);
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 2 }}>{t("admin.bookings.manageTitle")}</Typography>
-      <Button variant="contained" sx={{ mb: 2, mr: 1 }} onClick={openCreate}>{t("admin.bookings.add")}</Button>
-      <Button variant="outlined" color="error" sx={{ mb: 2 }} disabled={selected.length === 0} onClick={handleBulkDelete}>{t("common.deleteSelected")}</Button>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        <Button variant="contained" onClick={openCreate}>{t("admin.bookings.add")}</Button>
+        <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>{t("common.deleteSelected")}</Button>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>{t("admin.bookings.sortBy")}</InputLabel>
+          <Select
+            value={sortOrder}
+            label={t("admin.bookings.sortBy")}
+            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+          >
+            <MenuItem value="newest">{t("admin.bookings.newestFirst")}</MenuItem>
+            <MenuItem value="oldest">{t("admin.bookings.oldestFirst")}</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       {errorMsg && <Typography color="error" sx={{ mb: 1 }}>{errorMsg}</Typography>}
       <TableContainer component={Paper}>
         <Table>
@@ -138,7 +173,7 @@ const AdminBookings = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {bookings.map((b) => (
+            {sortedBookings.map((b) => (
               <TableRow key={b.id}>
                 <TableCell>
                   <input type="checkbox" checked={selected.includes(b.id!)} onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, b.id!] : prev.filter(x => x !== b.id))} />
@@ -161,7 +196,17 @@ const AdminBookings = () => {
         <DialogTitle>{editing ? t("admin.bookings.edit") : t("admin.bookings.add")}</DialogTitle>
         <DialogContent>
           <TextField fullWidth margin="dense" type="datetime-local" label={t("admin.bookings.start")} value={(form.bookingDateTime as any) || ""} onChange={(e) => setForm({ ...form, bookingDateTime: e.target.value as any })} InputLabelProps={{ shrink: true }} />
-          <TextField fullWidth margin="dense" type="number" label={t("admin.bookings.durationHours")} value={form.duration || 1} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>{t("admin.bookings.durationHours")}</InputLabel>
+            <Select
+              value={form.duration || 1}
+              label={t("admin.bookings.durationHours")}
+              onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
+            >
+              <MenuItem value={1}>{t("admin.bookings.duration1Hour")}</MenuItem>
+              <MenuItem value={2}>{t("admin.bookings.duration2Hours")}</MenuItem>
+            </Select>
+          </FormControl>
           <FormControlLabel control={<Checkbox checked={form.isPlayingAlone} onChange={(e) => setForm({ ...form, isPlayingAlone: e.target.checked, fellows: e.target.checked ? 0 : form.fellows })} />} label={t("admin.bookings.playingAlone")} />
           <TextField fullWidth margin="dense" type="number" label={t("admin.bookings.fellows")} value={form.fellows} onChange={(e) => setForm({ ...form, fellows: Number(e.target.value) })} disabled={form.isPlayingAlone} />
           <Typography sx={{ mt: 2, mb: 1 }}>{t("admin.bookings.devices")}</Typography>

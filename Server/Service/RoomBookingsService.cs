@@ -49,7 +49,6 @@ namespace gameroombookingsys.Service
                     player = await _playersRepository.AddPlayer(new Player
                     {
                         Email = email,
-                        Theme = "light",
                     });
                 }
 

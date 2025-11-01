@@ -61,7 +61,7 @@ const Login: React.FC = () => {
       // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log("[DEV] request-code status:", resp.status);
       if (!resp.ok) {
-        throw new Error("Koodin lähetys epäonnistui");
+        throw new Error(t("notify.sendFailed"));
       }
 
       // Try to read debug header (server may expose it for dev)

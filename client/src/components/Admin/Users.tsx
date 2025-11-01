@@ -24,8 +24,8 @@ const AdminUsers = () => {
       fetch(`${base}/api/admin/players`, { headers: OpenAPI.HEADERS as any }),
     ])
       .then(async ([u, p]) => {
-        if (!u.ok) throw new Error("Failed to load users");
-        if (!p.ok) throw new Error("Failed to load players");
+        if (!u.ok) throw new Error(t("errors.loadUsersFailed"));
+        if (!p.ok) throw new Error(t("errors.loadPlayersFailed"));
         const usersJson = await u.json();
         const playersJson = await p.json();
         setUsers(usersJson || []);

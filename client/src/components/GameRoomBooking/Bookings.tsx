@@ -1,8 +1,8 @@
-import { Box, Typography, Modal } from "@mui/material";
+import { Box, Typography, Dialog, DialogTitle } from "@mui/material";
 import { RoomBookingDto, RoomBookingsService } from "../../api";
 import { useContext, useEffect, useState } from "react";
 import { api, BookingStatus, DeviceDto } from "../../api/api";
-import dayjs, { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc"; // Importing the utc plugin for dayjs
 dayjs.extend(utc); // Extending dayjs with the utc plugin
 import { useSnackbar } from "notistack";
@@ -12,6 +12,7 @@ import Calendar from "./Calendar";
 import { getStatusColor, getStatusTooltip } from "./BookingHelpers";
 import { LoaderContext } from "../../context/LoaderProvider";
 import { usePrompt } from "../../hooks/usePrompt";
+import { useTranslation } from "react-i18next";
 
 const initialBooking: RoomBookingDto = {
   bookingDateTime: undefined,
@@ -22,6 +23,7 @@ const initialBooking: RoomBookingDto = {
 };
 
 const Bookings = () => {
+  const { t } = useTranslation();
   const { enqueueSnackbar } = useSnackbar();
   const { playerInfo } = usePlayerInfo();
   const { setLoading } = useContext(LoaderContext);
@@ -35,7 +37,6 @@ const Bookings = () => {
   );
   const [bookRoom, setBookRoom] = useState<RoomBookingDto>(initialBooking);
   const [allDevices, setAllDevices] = useState<DeviceDto[]>([]);
-  const [inputValue, setInputValue] = useState("");
   const [originalBooking, setOriginalBooking] = useState<RoomBookingDto | null>(
     null
   );
@@ -137,103 +138,95 @@ const Bookings = () => {
     }
   };
 
-  const handleBookingDateTimeChange = (newValue: Dayjs | null) => {
+  const handleBookingDateTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     if (modalMode === ModalMode.CREATE) {
       setBookRoom((prev) => ({
         ...prev,
-        bookingDateTime: newValue
-          ? dayjs.utc(newValue).format("YYYY-MM-DDTHH:mm")
-          : "",
+        bookingDateTime: value as any,
       }));
     } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
       setSelectedBooking({
         ...selectedBooking,
-        bookingDateTime: newValue
-          ? dayjs.utc(newValue).format("YYYY-MM-DDTHH:mm")
-          : "",
+        bookingDateTime: value as any,
       });
     }
   };
 
-  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const numHours = parseInt(value, 10);
+  const handleDurationChange = (e: { target: { value: number } }) => {
+    const numHours = e.target.value;
     if (modalMode === ModalMode.CREATE) {
       setBookRoom({
         ...bookRoom,
-        duration: !isNaN(numHours) ? numHours : undefined,
+        duration: numHours,
       });
     } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
       setSelectedBooking({
         ...selectedBooking,
-        duration: !isNaN(numHours) ? numHours : undefined,
-      });
-    }
-  };
-
-  const handleDeviceInputChange = (
-    _: React.SyntheticEvent,
-    newInputValue: string
-  ) => {
-    setInputValue(newInputValue);
-  };
-
-  const handleDeviceSelect = (
-    _: React.SyntheticEvent,
-    newValue: DeviceDto[]
-  ) => {
-    if (modalMode === ModalMode.CREATE) {
-      setBookRoom((prev) => ({
-        ...prev,
-        devices: newValue,
-      }));
-    } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
-      setSelectedBooking({
-        ...selectedBooking,
-        devices: newValue,
-      });
-    }
-    setInputValue("");
-  };
-
-  const handlePlayingAloneChange = () => {
-    if (modalMode === ModalMode.CREATE) {
-      setBookRoom((prev) => ({
-        ...prev,
-        isPlayingAlone: true,
-        fellows: 0,
-      }));
-    } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
-      setSelectedBooking({
-        ...selectedBooking,
-        isPlayingAlone: true,
-        fellows: 0,
+        duration: numHours,
       });
     }
   };
 
-  const handleWithFellowsChange = () => {
+  const handlePlayingAloneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
     if (modalMode === ModalMode.CREATE) {
       setBookRoom((prev) => ({
         ...prev,
-        isPlayingAlone: false,
-        fellows: undefined,
+        isPlayingAlone: checked,
+        fellows: checked ? 0 : prev.fellows,
       }));
     } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
       setSelectedBooking({
         ...selectedBooking,
-        isPlayingAlone: false,
-        fellows: undefined,
+        isPlayingAlone: checked,
+        fellows: checked ? 0 : selectedBooking.fellows,
       });
     }
   };
 
   const handleFellowsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fellowsValue = parseInt(e.target.value, 10);
+    const fellowsValue = parseInt(e.target.value, 10) || 0;
     if (modalMode === ModalMode.CREATE) {
       setBookRoom({ ...bookRoom, fellows: fellowsValue });
     } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
       setSelectedBooking({ ...selectedBooking, fellows: fellowsValue });
+    }
+  };
+
+  const handleDeviceChange = (deviceId: number, checked: boolean) => {
+    if (modalMode === ModalMode.CREATE) {
+      const currentDevices = bookRoom.devices ?? [];
+      if (checked) {
+        const device = allDevices.find(d => d.id === deviceId);
+        if (device) {
+          setBookRoom({
+            ...bookRoom,
+            devices: [...currentDevices, device],
+          });
+        }
+      } else {
+        setBookRoom({
+          ...bookRoom,
+          devices: currentDevices.filter(d => d.id !== deviceId),
+        });
+      }
+    } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
+      const currentDevices = selectedBooking.devices ?? [];
+      if (checked) {
+        const device = allDevices.find(d => d.id === deviceId);
+        if (device) {
+          setSelectedBooking({
+            ...selectedBooking,
+            devices: [...currentDevices, device],
+          });
+        }
+      } else {
+        setSelectedBooking({
+          ...selectedBooking,
+          devices: currentDevices.filter(d => d.id !== deviceId),
+        });
+      }
     }
   };
 
@@ -274,9 +267,9 @@ const Bookings = () => {
       try {
         const response = await api.RoomBookingsService.bookGameRoom(bookRoom);
         enqueueSnackbar(
-          `Room booked successfully on ${dayjs(bookRoom.bookingDateTime).format(
-            "MMMM D, YYYY h:mm A"
-          )}!`,
+          t("notify.roomBookedSuccess", {
+            date: dayjs(bookRoom.bookingDateTime).format("MMMM D, YYYY h:mm A")
+          }),
           { variant: "success" }
         );
 
@@ -338,15 +331,15 @@ const Bookings = () => {
       );
       setCalendar(updatedBookings);
       setSelectedBooking(updatedBooking);
-      enqueueSnackbar(
-        `Booking updated successfully on ${dayjs(
-          selectedBooking.bookingDateTime
-        ).format("MMMM D, YYYY h:mm A")}!`,
-        { variant: "success" }
-      );
+        enqueueSnackbar(
+          t("notify.bookingUpdatedSuccess", {
+            date: dayjs(selectedBooking.bookingDateTime).format("MMMM D, YYYY h:mm A")
+          }),
+          { variant: "success" }
+        );
       setModalOpen(false);
     } catch (error: any) {
-      enqueueSnackbar("Error updating booking", { variant: "error" });
+      enqueueSnackbar(t("errors.bookingUpdateFailed"), { variant: "error" });
       console.error("Error updating booking:", error);
     } finally {
       setLoading(false);
@@ -356,9 +349,7 @@ const Bookings = () => {
   const onCancelBooking = async () => {
     if (!selectedBooking || !selectedBooking.id) return;
     // Update the booking status to cancelled
-    const confirmCancel = window.confirm(
-      "Are you sure you want to cancel this booking?"
-    );
+    const confirmCancel = window.confirm(t("bookings.confirmCancel"));
     if (!confirmCancel) return;
     const updatedBooking = {
       ...selectedBooking,
@@ -370,7 +361,7 @@ const Bookings = () => {
         selectedBooking.id,
         updatedBooking
       );
-      enqueueSnackbar("Booking cancelled successfully!", {
+      enqueueSnackbar(t("notify.bookingCancelled"), {
         variant: "success",
       });
       setModalOpen(false);
@@ -379,7 +370,7 @@ const Bookings = () => {
         setCalendarKey((prevKey) => prevKey + 1); // Force re-render of calendar
       }
     } catch (error: any) {
-      enqueueSnackbar("Error cancelling booking", { variant: "error" });
+      enqueueSnackbar(t("errors.bookingCancelFailed"), { variant: "error" });
       console.error("Error cancelling booking:", error);
     } finally {
       setLoading(false);
@@ -388,21 +379,19 @@ const Bookings = () => {
 
   const onDeleteBooking = async () => {
     if (!selectedBooking || !selectedBooking.id) return;
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this booking?"
-    );
+    const confirmDelete = window.confirm(t("bookings.confirmDelete"));
     if (!confirmDelete) return;
 
     setLoading(true);
     try {
       await api.RoomBookingsService.deleteBooking(selectedBooking.id);
-      enqueueSnackbar("Booking deleted successfully!", { variant: "success" });
+      enqueueSnackbar(t("notify.bookingDeleted"), { variant: "success" });
       setModalOpen(false);
       if (playerInfo && playerInfo.id) {
         fetchPlayerBookings(playerInfo.id);
       }
     } catch (error: any) {
-      enqueueSnackbar("Error deleting booking", { variant: "error" });
+      enqueueSnackbar(t("errors.bookingDeleteFailed"), { variant: "error" });
       console.error("Error deleting booking:", error);
     } finally {
       setLoading(false);
@@ -411,14 +400,11 @@ const Bookings = () => {
 
   const isChanged = checkFieldsValidation() || checkFieldsChange();
 
-  usePrompt(
-    "You have unsaved changes. Are you sure you want to leave?",
-    isChanged
-  );
+  usePrompt(t("common.unsavedChangesPrompt"), isChanged);
 
   return (
     <Box sx={styles.container}>
-      <Typography sx={styles.title}>Calendar</Typography>
+      <Typography sx={styles.title}>{t("nav.calendar")}</Typography>
       <Calendar
         key={calendarKey} // Force re-render of calendar when key changes
         events={events}
@@ -426,37 +412,38 @@ const Bookings = () => {
         onShowExistingBooking={handleShowExistingBooking}
         getStatusTooltip={getStatusTooltip}
       />
-      {/* Modal for creating/editing bookings */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
-        <Box sx={styles.modalStyles}>
-          <BookingForm
-            mode={modalMode}
-            booking={
-              modalMode === ModalMode.CREATE ? bookRoom : selectedBooking!
-            }
-            allDevices={allDevices}
-            inputValue={inputValue}
-            selectedBooking={selectedBooking}
-            onSelectedBooking={
-              modalMode === ModalMode.CREATE ? setBookRoom : setSelectedBooking
-            }
-            onInputChange={handleDeviceInputChange}
-            onDeviceSelect={handleDeviceSelect}
-            onBookingDateTimeChange={handleBookingDateTimeChange}
-            onDurationChange={handleDurationChange}
-            onPlayingAloneChange={handlePlayingAloneChange}
-            onWithFellowsChange={handleWithFellowsChange}
-            onFellowsChange={handleFellowsChange}
-            onSubmit={handleRoomBooking}
-            onUpdateBooking={updateBooking}
-            onCancel={() => setModalOpen(false)}
-            checkFieldsValidation={checkFieldsValidation}
-            onDeleteBooking={onDeleteBooking}
-            onCancelBooking={onCancelBooking}
-            onFieldChange={checkFieldsChange}
-          />
-        </Box>
-      </Modal>
+      {/* Dialog for creating/editing bookings */}
+      <Dialog open={modalOpen} onClose={() => setModalOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {modalMode === ModalMode.CREATE
+            ? t("admin.bookings.add")
+            : selectedBooking?.status === BookingStatus.CANCELLED
+            ? t("bookings.cancelledBooking")
+            : selectedBooking?.status === BookingStatus.COMPLETED
+            ? t("bookings.completedBooking")
+            : t("bookings.updateBooking")}
+        </DialogTitle>
+        <BookingForm
+          mode={modalMode}
+          booking={
+            modalMode === ModalMode.CREATE ? bookRoom : selectedBooking!
+          }
+          allDevices={allDevices}
+          selectedBooking={selectedBooking}
+          onBookingDateTimeChange={handleBookingDateTimeChange}
+          onDurationChange={handleDurationChange}
+          onPlayingAloneChange={handlePlayingAloneChange}
+          onFellowsChange={handleFellowsChange}
+          onDeviceChange={handleDeviceChange}
+          onSubmit={handleRoomBooking}
+          onUpdateBooking={updateBooking}
+          onCancel={() => setModalOpen(false)}
+          checkFieldsValidation={checkFieldsValidation}
+          onDeleteBooking={onDeleteBooking}
+          onCancelBooking={onCancelBooking}
+          onFieldChange={checkFieldsChange}
+        />
+      </Dialog>
     </Box>
   );
 };
@@ -474,16 +461,5 @@ const styles = {
     fontSize: 32,
     letterSpacing: 1,
     marginBottom: 4,
-  },
-  modalStyles: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    width: 600,
-    bgcolor: "white",
-    borderRadius: "8px",
-    p: 3,
-    boxShadow: 24,
   },
 };

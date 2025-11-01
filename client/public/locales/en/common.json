@@ -1,6 +1,14 @@
 {
   "Language": "Language",
   "Settings": "Settings",
+  
+  "nav.profile": "Profile",
+  "nav.calendar": "Calendar",
+  "nav.settings": "Settings",
+  "nav.users": "Users",
+  "nav.devices": "Devices",
+  "nav.bookings": "Bookings",
+  
   "common.email": "Email",
   "common.id": "ID",
   "common.created": "Created",
@@ -13,13 +21,18 @@
   "common.save": "Save",
   "common.create": "Create",
   "common.confirmDeletion": "Confirm deletion",
-  "errors.deleteFailed": "Delete failed",
+  "common.close": "Close",
+  "common.loading": "Loading...",
+  "common.unsavedChangesPrompt": "You have unsaved changes. Are you sure you want to leave?",
+  
   "admin.users.manageTitle": "Manage Users & Players",
   "admin.users.authUsers": "Auth Users",
   "admin.users.players": "Players",
   "admin.users.searchByEmail": "Search by email",
   "admin.users.lastLogin": "Last Login",
   "admin.users.confirmDeleteBody": "Are you sure you want to permanently delete {{count}} user(s)? This cannot be undone.",
+  
+  "admin.devices.manageTitle": "Manage Devices",
   "admin.devices.add": "Add device",
   "admin.devices.edit": "Edit device",
   "admin.devices.name": "Name",
@@ -27,6 +40,7 @@
   "admin.devices.quantity": "Quantity",
   "admin.devices.available": "Available",
   "admin.devices.status": "Status",
+  
   "admin.bookings.manageTitle": "Manage Bookings",
   "admin.bookings.add": "Add booking",
   "admin.bookings.edit": "Edit booking",
@@ -34,9 +48,15 @@
   "admin.bookings.start": "Start",
   "admin.bookings.end": "End",
   "admin.bookings.durationHours": "Duration (hours)",
+  "admin.bookings.duration1Hour": "1 hour",
+  "admin.bookings.duration2Hours": "2 hours",
   "admin.bookings.playingAlone": "Playing alone",
   "admin.bookings.fellows": "Fellows",
   "admin.bookings.devices": "Devices",
+  "admin.bookings.sortBy": "Sort by",
+  "admin.bookings.newestFirst": "Newest first",
+  "admin.bookings.oldestFirst": "Oldest first",
+  
   "login.title": "Sign in",
   "login.emailLabel": "Enter your email (@edu.xamk.fi / @xamk.fi only)",
   "login.sendCode": "Send one-time code",
@@ -45,9 +65,42 @@
   "login.verify": "Verify and sign in",
   "login.verifying": "Verifying...",
   "login.back": "Back",
+  
+  "errors.deleteFailed": "Delete failed",
   "errors.onlySchoolEmails": "Only Xamk emails are allowed.",
+  "errors.invalidUniversityEmail": "Please enter a valid university email (@edu.xamk.fi).",
   "errors.generic": "Something went wrong. Try again.",
+  
   "notify.codeSent": "One-time code sent to your email.",
   "notify.sendFailed": "Failed to send the code",
-  "notify.verifyFailed": "Failed to verify the code"
+  "notify.verifyFailed": "Failed to verify the code",
+  "notify.bookingCancelled": "Booking cancelled successfully!",
+  "notify.bookingDeleted": "Booking deleted successfully!",
+  "notify.bookingUpdatedSuccess": "Booking updated successfully on {{date}}",
+  "notify.roomBookedSuccess": "Room booked successfully on {{date}}",
+  "notify.profileUpdated": "Player info updated successfully",
+  
+  "bookings.deleteBooking": "Delete Booking",
+  "bookings.cancelBooking": "Cancel Booking",
+  "bookings.cancelledBooking": "Cancelled Booking",
+  "bookings.completedBooking": "Completed Booking",
+  "bookings.updateBooking": "Update Booking",
+  "bookings.passCode": "Pass Code",
+  "bookings.passcodeExpired": "Passcode expired.",
+  "bookings.confirmCancel": "Are you sure you want to cancel this booking?",
+  "bookings.confirmDelete": "Are you sure you want to delete this booking?",
+  
+  "errors.bookingFailed": "Error booking room",
+  "errors.bookingUpdateFailed": "Error updating booking",
+  "errors.bookingCancelFailed": "Error cancelling booking",
+  "errors.bookingDeleteFailed": "Error deleting booking",
+  "errors.profileUpdateFailed": "Error updating player info",
+  "errors.loadUsersFailed": "Failed to load users",
+  "errors.loadPlayersFailed": "Failed to load players",
+  "errors.loadError": "Error",
+  "errors.registrationEmailFailed": "Error sending registration email: {{error}}",
+  
+  "registration.title": "Register in",
+  "registration.emailPrompt": "Enter your university email to receive a registration link",
+  "registration.send": "Send"
 }
