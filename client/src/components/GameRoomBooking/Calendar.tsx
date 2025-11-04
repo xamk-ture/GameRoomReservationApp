@@ -3,6 +3,9 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { Box } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import fiLocale from "@fullcalendar/core/locales/fi";
+import enLocale from "@fullcalendar/core/locales/en-gb";
 
 interface CalendarProps {
   events: any[];
@@ -17,12 +20,29 @@ const Calendar = ({
   onCreateNewBooking,
   onShowExistingBooking,
 }: CalendarProps) => {
+  const { i18n } = useTranslation();
+  
+  // Map i18n language codes to FullCalendar locales
+  const getLocale = () => {
+    const lang = i18n.language.split('-')[0]; // Get base language code (e.g., "fi" from "fi-FI")
+    switch (lang) {
+      case 'fi':
+        return fiLocale;
+      case 'en':
+        return enLocale;
+      default:
+        return enLocale;
+    }
+  };
+  
   return (
     <Box sx={{ height: "calc(100vh - 140px)" }}>
       <FullCalendar
+        key={i18n.language} // Force re-render when language changes
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
         initialDate={new Date()}
+        locale={getLocale()}
         headerToolbar={{
           left: "prev,next today",
           center: "title",

@@ -12,8 +12,8 @@ using gameroombookingsys;
 namespace gameroombookingsys.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251013155806_DropPlayerUsernamePhone")]
-    partial class DropPlayerUsernamePhone
+    [Migration("20251104103104_InitialBaseline")]
+    partial class InitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -138,18 +138,13 @@ namespace gameroombookingsys.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("PictureUrl")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Theme")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
 
                     b.ToTable("Players");
                 });
@@ -212,6 +207,16 @@ namespace gameroombookingsys.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_DeviceRoomBooking_RoomBookings_RoomBookingId");
+                });
+
+            modelBuilder.Entity("Gameroombookingsys.Models.Player", b =>
+                {
+                    b.HasOne("Gameroombookingsys.Models.AuthUser", null)
+                        .WithOne()
+                        .HasForeignKey("Gameroombookingsys.Models.Player", "Email")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Players_Users_Email");
                 });
 
             modelBuilder.Entity("Gameroombookingsys.Models.RoomBooking", b =>

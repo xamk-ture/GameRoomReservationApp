@@ -1,14 +1,16 @@
 import { Box, Button, Typography, IconButton } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
-import { navButtons } from "./Data";
+import { adminNavButtons, navButtons } from "./Data";
 import { useState } from "react";
 import AppTitle from "../../assets/APP-TITLE.svg";
 import { usePlayerInfo } from "../../hooks/usePlayerInfo";
 import LogoutIcon from "@mui/icons-material/Logout";
+import { useTranslation } from "react-i18next";
 
-const Navigation = () => {
+const Navigation = ({ isAdminMenu = false }: { isAdminMenu?: boolean }) => {
   const { error } = usePlayerInfo();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const [focusedButton, setFocusedButton] = useState(location.pathname);
 
@@ -17,11 +19,11 @@ const Navigation = () => {
       <Box sx={styles.title}>
         <img src={AppTitle} alt="X Game Room" style={{ textAlign: "center" }} />
       </Box>
-      {error && <Typography sx={styles.error}>Error: {error}</Typography>}
+      {error && <Typography sx={styles.error}>{t("errors.loadError")}: {error}</Typography>}
       <Box sx={styles.navButtons}>
-        {navButtons.map((button) => (
+        {(isAdminMenu ? adminNavButtons : navButtons).map((button) => (
           <Button
-            key={button.label}
+            key={button.translationKey}
             variant="outlined"
             onFocus={() => setFocusedButton(button.path)}
             sx={{
@@ -30,7 +32,7 @@ const Navigation = () => {
               borderColor: "black",
             }}
           >
-            <Link to={button.path}>{button.label}</Link>
+            <Link to={button.path}>{t(button.translationKey)}</Link>
           </Button>
         ))}
       </Box>

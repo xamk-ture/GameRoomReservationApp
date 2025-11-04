@@ -34,8 +34,6 @@ namespace Gameroombookingsys.Services
                 player = await _playerRepository.AddPlayer(new Player
                 {
                     Email = email,
-                    Theme = "light",
-                    PictureUrl = string.Empty,
                 });
             }
 
@@ -55,9 +53,7 @@ namespace Gameroombookingsys.Services
                 if (player == null)
                     throw new KeyNotFoundException("Player not found.");
 
-                // Update fields
-                player.PictureUrl = playerDto.PictureUrl;
-                player.Theme = playerDto.Theme;
+                // Update fields (no theme update needed)
 
                 var updatedPlayer = await _playerRepository.UpdatePlayer(player);
 

@@ -13,12 +13,16 @@ import { PlayerDto } from "../../api/api";
 import gameRoomImage from "../../assets/gameroomimage.svg";
 import { enqueueSnackbar } from "notistack";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../../context/AuthProvider";
 import AppTitleColored from "../../assets/APP-TITLE-COLORED.svg";
 import LanguagePicker from "../LanguagePicker";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { setToken } = useAuth();
+
+  // Do NOT auto-redirect on load; always show login. Redirect only after verify.
 
   const [playerDto, setPlayerDto] = useState<PlayerDto>({});
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +61,7 @@ const Login: React.FC = () => {
       // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log("[DEV] request-code status:", resp.status);
       if (!resp.ok) {
-        throw new Error("Koodin lähetys epäonnistui");
+        throw new Error(t("notify.sendFailed"));
       }
 
       // Try to read debug header (server may expose it for dev)
@@ -108,9 +112,29 @@ const Login: React.FC = () => {
       const data = await resp.json();
       const token = data?.token;
       if (!token) throw new Error();
-      localStorage.setItem("jwtToken", token);
-      OpenAPI.HEADERS = { Authorization: `Bearer ${token}` };
-      navigate("/profile");
+      // Store via AuthProvider to keep app state in sync
+      setToken(token);
+      // Decode locally to decide landing route immediately
+      const [, payload] = token.split(".");
+      const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+      const collect = (val: unknown): string[] => (Array.isArray(val) ? val.map((v) => String(v)) : val != null ? [String(val)] : []);
+      const roles = [
+        ...collect(claims["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"]),
+        ...collect(claims["roles"]),
+        ...collect(claims["role"]),
+        ...collect((claims as any)?.realm_access?.roles),
+      ].map((r) => r.trim().toLowerCase());
+      const isAdmin = roles.includes("admin");
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log("[DEV] JWT roles:", roles);
+      }
+      const pref = localStorage.getItem("landingPreference");
+      if (pref === "user") {
+        navigate("/profile");
+      } else {
+        navigate(isAdmin ? "/admin" : "/profile");
+      }
     } catch (e: any) {
       setError(t("errors.generic"));
       enqueueSnackbar(t("notify.verifyFailed"), { variant: "error" });

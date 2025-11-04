@@ -26,11 +26,18 @@ namespace gameroombookingsys.Controllers
         [ProducesResponseType(typeof(RoomBookingDto), StatusCodes.Status200OK)]
         // Control the method name
         [SwaggerOperation(OperationId = "BookGameRoom")]
-        public async Task<ActionResult<RoomBookingDto>> BookGameRoom([FromBody] RoomBookingDto dto)
+        public async Task<ActionResult<RoomBookingDto>> BookGameRoom([FromBody] RoomBookingCreateRequest request)
         {
             try
             {
-
+                var dto = new RoomBookingDto
+                {
+                    BookingDateTime = request.BookingDateTime,
+                    Duration = request.Duration,
+                    isPlayingAlone = request.isPlayingAlone,
+                    Fellows = request.Fellows,
+                    Devices = (request.DeviceIds ?? new List<int>()).Distinct().Select(id => new DeviceDto { Id = id }).ToList(),
+                };
                 var booking = await _roomBookingService.BookGameRoom(dto);
                 return Ok(booking);
             }
@@ -53,10 +60,18 @@ namespace gameroombookingsys.Controllers
         [ProducesResponseType(typeof(RoomBookingDto), StatusCodes.Status200OK)]
         // Control the method name
         [SwaggerOperation(OperationId = "UpdateRoomBooking")]
-        public async Task<ActionResult<RoomBookingDto>> UpdateRoomBooking(int id, [FromBody] RoomBookingDto dto)
+        public async Task<ActionResult<RoomBookingDto>> UpdateRoomBooking(int id, [FromBody] RoomBookingUpdateRequest request)
         {
             try
             {
+                var dto = new RoomBookingDto
+                {
+                    BookingDateTime = request.BookingDateTime,
+                    Duration = request.Duration,
+                    isPlayingAlone = request.isPlayingAlone,
+                    Fellows = request.Fellows,
+                    Devices = (request.DeviceIds ?? new List<int>()).Distinct().Select(id => new DeviceDto { Id = id }).ToList(),
+                };
                 var updatedBooking = await _roomBookingService.UpdateRoomBooking(id, dto);
                 return Ok(updatedBooking);
             }
@@ -166,6 +181,7 @@ namespace gameroombookingsys.Controllers
 
         // Add this method in your RoomBookingsController
         [HttpGet("allbookings")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "Admin")]
         [ProducesResponseType(typeof(List<RoomBookingDto>), StatusCodes.Status200OK)]
         [SwaggerOperation(OperationId = "GetAllBookings")]
         public async Task<ActionResult<List<RoomBookingDto>>> GetAllBookings()
@@ -182,6 +198,7 @@ namespace gameroombookingsys.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "Admin")]
         [ProducesResponseType(typeof(List<RoomBookingDto>), StatusCodes.Status200OK)]
         [SwaggerOperation(OperationId = "DeleteBooking")]
         public async Task<ActionResult> DeleteBooking(int id)

@@ -3,17 +3,19 @@ import {
   Box,
   Typography,
   TextField,
+  DialogContent,
+  DialogActions,
   Button,
-  Chip,
   Checkbox,
-  FormGroup,
   FormControlLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
-import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import Autocomplete from "@mui/material/Autocomplete";
-import dayjs, { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { RoomBookingDto, DeviceDto, BookingStatus } from "../../api";
+import { useTranslation } from "react-i18next";
 
 export enum ModalMode {
   CREATE = "CREATE",
@@ -24,16 +26,12 @@ export interface BookingFormProps {
   mode: ModalMode;
   booking: RoomBookingDto;
   allDevices: DeviceDto[];
-  inputValue: string;
   selectedBooking: RoomBookingDto | null;
-  onSelectedBooking: (booking: RoomBookingDto) => void;
-  onInputChange: (event: React.SyntheticEvent, value: string) => void;
-  onDeviceSelect: (_: React.SyntheticEvent, newValue: DeviceDto[]) => void;
-  onBookingDateTimeChange: (newValue: Dayjs | null) => void;
-  onDurationChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPlayingAloneChange: () => void;
-  onWithFellowsChange: () => void;
+  onBookingDateTimeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDurationChange: (e: { target: { value: number } }) => void;
+  onPlayingAloneChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFellowsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDeviceChange: (deviceId: number, checked: boolean) => void;
   onSubmit: () => void;
   onCancel: () => void;
   checkFieldsValidation: () => boolean;
@@ -44,19 +42,17 @@ export interface BookingFormProps {
 }
 
 const BookingForm = (props: BookingFormProps) => {
+  const { t } = useTranslation();
   const {
     mode,
     booking,
     allDevices,
-    inputValue,
     selectedBooking,
-    onInputChange,
-    onDeviceSelect,
     onBookingDateTimeChange,
     onDurationChange,
     onPlayingAloneChange,
-    onWithFellowsChange,
     onFellowsChange,
+    onDeviceChange,
     onSubmit,
     onCancel,
     checkFieldsValidation,
@@ -64,237 +60,142 @@ const BookingForm = (props: BookingFormProps) => {
     onDeleteBooking,
     onFieldChange,
     onUpdateBooking,
-    onSelectedBooking,
   } = props;
 
   const isCancelled = booking.status === BookingStatus.CANCELLED;
   const isCompleted = booking.status === BookingStatus.COMPLETED;
   const isDisabled = isCancelled || isCompleted;
 
-  return (
-    <Box sx={styles.form}>
-      <Typography sx={styles.bookgGameRoomTitle}>
-        {mode === ModalMode.CREATE
-          ? "Book Game Room"
-          : isCancelled
-          ? "Cancelled Booking"
-          : isCompleted
-          ? "Completed Booking"
-          : "Update Booking"}
-      </Typography>
+  const currentDevices = mode === ModalMode.CREATE ? booking.devices ?? [] : selectedBooking?.devices ?? [];
+  const deviceIds = currentDevices.map(d => d.id!).filter(Boolean) as number[];
 
-      {/* New Pass Code field: display only in update mode */}
-      {mode === ModalMode.UPDATE && (
-        <Box width="100%" sx={{ mb: 2 }}>
+  const formatDateTimeForInput = (dateTime?: string) => {
+    if (!dateTime) return "";
+    const d = dayjs(dateTime);
+    if (!d.isValid()) return "";
+    return d.format("YYYY-MM-DDTHH:mm");
+  };
+
+  return (
+    <>
+      <DialogContent>
+        {/* Pass Code field: display only in update mode */}
+        {mode === ModalMode.UPDATE && (
           <TextField
-            label="Pass Code"
-            value={booking.passCode || ""}
-            variant="standard"
             fullWidth
+            margin="dense"
+            label={t("bookings.passCode")}
+            value={booking.passCode || ""}
             disabled
             helperText={
               isCancelled || isCompleted || !booking.isPassCodeValid
-                ? "Passcode expired."
+                ? t("bookings.passcodeExpired")
                 : ""
             }
           />
-        </Box>
-      )}
+        )}
 
-      <Box sx={{ width: "100%" }}>
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DateTimePicker
-            orientation="portrait"
-            value={
-              booking.bookingDateTime ? dayjs(booking.bookingDateTime) : dayjs()
-            }
-            onChange={onBookingDateTimeChange}
-            sx={{ width: "100%" }}
-            disabled={isDisabled}
-          />
-        </LocalizationProvider>
-      </Box>
-      <Box width="100%">
         <TextField
-          id="outlined-helperText"
-          label="Duration *"
-          type="text"
-          defaultValue={booking.duration || ""}
-          onChange={onDurationChange}
-          variant="standard"
           fullWidth
-          inputProps={{ min: 0 }}
+          margin="dense"
+          type="datetime-local"
+          label={t("admin.bookings.start")}
+          value={formatDateTimeForInput(booking.bookingDateTime as any)}
+          onChange={(e) => {
+            const syntheticEvent = e as unknown as React.ChangeEvent<HTMLInputElement>;
+            onBookingDateTimeChange(syntheticEvent);
+          }}
+          InputLabelProps={{ shrink: true }}
           disabled={isDisabled}
         />
-      </Box>
-      <Box width="100%">
-        <Autocomplete
-          options={allDevices}
-          getOptionLabel={(option) => option.name || ""}
-          isOptionEqualToValue={(option, value) => option.id === value.id}
-          filterSelectedOptions
-          multiple
-          value={
-            mode === ModalMode.CREATE
-              ? booking.devices ?? []
-              : selectedBooking?.devices ?? []
-          }
-          inputValue={inputValue}
-          onInputChange={(event, newInputValue) => {
-            onInputChange(event, newInputValue);
-          }}
-          onChange={(event, newValue) => {
-            // De-duplicate by id to avoid duplicates in value
-            const deduped = newValue.filter(
-              (v, idx, arr) => idx === arr.findIndex((x) => x.id === v.id)
-            );
-            onDeviceSelect(event, deduped);
-          }}
-          renderTags={() => null}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Devices"
-              variant="standard"
+
+        <FormControl fullWidth margin="dense">
+          <InputLabel>{t("admin.bookings.durationHours")}</InputLabel>
+          <Select
+            value={booking.duration || 1}
+            label={t("admin.bookings.durationHours")}
+            onChange={(e) => onDurationChange({ target: { value: Number(e.target.value) } })}
+            disabled={isDisabled}
+          >
+            <MenuItem value={1}>{t("admin.bookings.duration1Hour")}</MenuItem>
+            <MenuItem value={2}>{t("admin.bookings.duration2Hours")}</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={booking.isPlayingAlone ?? true}
+              onChange={onPlayingAloneChange}
               disabled={isDisabled}
             />
-          )}
-          disabled={isDisabled}
+          }
+          label={t("admin.bookings.playingAlone")}
         />
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
-          {booking.devices &&
-            booking.devices.map((device, idx) => (
-              <Chip
-                key={`${device.id ?? device.name}-${idx}`}
-                label={device.name}
-                onDelete={
-                  isDisabled
-                    ? undefined
-                    : () => {
-                        onSelectedBooking({
-                          ...booking,
-                          devices: booking.devices?.filter(
-                            (d) => d.id !== device.id
-                          ),
-                        });
-                      }
-                }
-              />
-            ))}
-        </Box>
-      </Box>
-      <Box width="100%">
-        <FormGroup>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={booking.isPlayingAlone}
-                onChange={onPlayingAloneChange}
-                disabled={isDisabled}
-              />
-            }
-            label="Playing alone"
-            sx={{ width: "30%", marginTop: 1 }}
-          />
-          <Box
-            sx={{ display: "flex", alignItems: "center", gap: 2, height: 60 }}
-          >
+
+        <TextField
+          fullWidth
+          margin="dense"
+          type="number"
+          label={t("admin.bookings.fellows")}
+          value={booking.fellows ?? 0}
+          onChange={onFellowsChange}
+          disabled={booking.isPlayingAlone || isDisabled}
+        />
+
+        <Typography sx={{ mt: 2, mb: 1 }}>{t("admin.bookings.devices")}</Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+          {allDevices.map((d) => (
             <FormControlLabel
+              key={d.id}
               control={
                 <Checkbox
-                  checked={!booking.isPlayingAlone}
-                  onChange={onWithFellowsChange}
+                  checked={deviceIds.includes(d.id!)}
+                  onChange={(e) => onDeviceChange(d.id!, e.target.checked)}
                   disabled={isDisabled}
                 />
               }
-              label="With fellows"
+              label={d.name || `#${d.id}`}
             />
-            {!booking.isPlayingAlone && (
-              <TextField
-                id="outlined-helperText"
-                label="How many? *"
-                type="number"
-                value={booking.fellows || ""}
-                onChange={onFellowsChange}
-                variant="standard"
-                sx={{ marginTop: -2 }}
-                inputProps={{ min: 1 }}
-                disabled={isDisabled}
-              />
-            )}
-          </Box>
-        </FormGroup>
-      </Box>
-      <Box sx={styles.formButtons}>
+          ))}
+        </Box>
+      </DialogContent>
+      <DialogActions>
         {mode === ModalMode.UPDATE ? (
           isCancelled || isCompleted ? (
-            <>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={onDeleteBooking}
-              >
-                Delete Booking
-              </Button>
-            </>
+            <Button variant="contained" color="error" onClick={onDeleteBooking}>
+              {t("bookings.deleteBooking")}
+            </Button>
           ) : (
             <>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={onCancelBooking}
-              >
-                Cancel Booking
+              <Button onClick={onCancel}>{t("common.cancel")}</Button>
+              <Button variant="contained" color="error" onClick={onCancelBooking}>
+                {t("bookings.cancelBooking")}
               </Button>
               <Button
                 variant="contained"
                 onClick={onUpdateBooking}
                 disabled={mode === ModalMode.UPDATE && !onFieldChange()}
               >
-                Save
+                {t("common.save")}
               </Button>
             </>
           )
         ) : (
           <>
+            <Button onClick={onCancel}>{t("common.cancel")}</Button>
             <Button
               variant="contained"
               onClick={onSubmit}
               disabled={!checkFieldsValidation()}
             >
-              Save
+              {t("common.create")}
             </Button>
           </>
         )}
-        <Button
-          variant="outlined"
-          sx={{ borderColor: "red", color: "red" }}
-          onClick={onCancel}
-        >
-          Close
-        </Button>
-      </Box>
-    </Box>
+      </DialogActions>
+    </>
   );
 };
 
 export default BookingForm;
-
-const styles = {
-  form: {
-    display: "flex",
-    flexDirection: "column" as "column",
-    gap: 3,
-  },
-  bookgGameRoomTitle: {
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    fontSize: 32,
-    letterSpacing: 1,
-  },
-  formButtons: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 2,
-  },
-};

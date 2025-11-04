@@ -12,14 +12,18 @@ namespace gameroombookingsys.Service
         private readonly IUsersRepository _usersRepository;
         private readonly ILogger<AuthService> _logger;
 
+        private readonly IConfiguration _configuration;
+
         public AuthService(
             IOneTimeLoginCodesRepository codesRepository, 
             IUsersRepository usersRepository, 
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IConfiguration configuration)
         {
             _codesRepository = codesRepository;
             _usersRepository = usersRepository;
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email)
@@ -73,7 +77,23 @@ namespace gameroombookingsys.Service
                 // Continue with token generation even if user upsert fails
             }
 
-            var claims = new[] { new Claim("email", email) };
+            var claims = new List<Claim> { new Claim("email", email) };
+
+            try
+            {
+                var allowedAdmins = _configuration.GetSection("Admin:AllowedEmails").Get<string[]>() ?? Array.Empty<string>();
+                var allowedPatterns = _configuration.GetSection("Admin:AllowedEmailPatterns").Get<string[]>() ?? Array.Empty<string>();
+
+                bool isExact = allowedAdmins.Any(a => a.Equals(email, StringComparison.OrdinalIgnoreCase));
+                bool matchesPattern = allowedPatterns.Any(p => IsEmailMatch(email, p));
+
+                if (isExact || matchesPattern)
+                {
+                    claims.Add(new Claim(System.Security.Claims.ClaimTypes.Role, "Admin"));
+                }
+            }
+            catch { }
+
             var token = JwtTokenGenerator.CreateJwt(claims, DateTime.UtcNow.AddHours(1));
             return token;
         }
@@ -81,6 +101,41 @@ namespace gameroombookingsys.Service
         public async Task<int> CleanupExpiredAsync()
         {
             return await _codesRepository.RemoveExpired(DateTime.UtcNow);
+        }
+
+        private static bool IsEmailMatch(string email, string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(pattern)) return false;
+            // Support simple '*' wildcard matching
+            // Examples: "admin*@edu.xamk.fi", "*@xamk.fi"
+            if (!pattern.Contains('*', StringComparison.Ordinal))
+            {
+                return string.Equals(email, pattern, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var parts = pattern.Split('*');
+            var remaining = email;
+            var first = true;
+            foreach (var part in parts)
+            {
+                if (part.Length == 0)
+                {
+                    continue;
+                }
+                var idx = remaining.IndexOf(part, first ? StringComparison.OrdinalIgnoreCase : StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) return false;
+                // Move past the matched segment
+                remaining = remaining.Substring(idx + part.Length);
+                first = false;
+            }
+            // If pattern ends with '*' then we allow remaining to have extra chars
+            // If pattern does not end with '*', ensure we matched the suffix at the end
+            if (!pattern.EndsWith("*", StringComparison.Ordinal))
+            {
+                // We must have consumed to end (i.e., last part matched at the end)
+                return remaining.Length == 0;
+            }
+            return true;
         }
     }
 }

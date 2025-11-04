@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Button, Modal, TextField, Typography } from "@mui/material";
 import AppTitleColored from "../../assets/APP-TITLE-COLORED.svg";
+import { useTranslation } from "react-i18next";
 
 interface RegistrationModalProps {
   open: boolean;
@@ -13,12 +14,13 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
   onClose,
   onSend,
 }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
 
   const handleSend = async () => {
     if (!email.endsWith("@edu.xamk.fi")) {
-      setError("Please enter a valid university email (@edu.xamk.fi).");
+      setError(t("errors.invalidUniversityEmail"));
       return;
     }
     try {
@@ -27,7 +29,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       setError("");
       onClose();
     } catch (e: any) {
-      setError("Error sending registration email: " + (e.message || e));
+      setError(t("errors.registrationEmailFailed", { error: e.message || e }));
     }
   };
 
@@ -43,17 +45,17 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       <Box sx={styles.wrapper}>
         <Box sx={styles.titleAndLogo}>
           <Typography variant="h5" sx={styles.title}>
-            Register in
+            {t("registration.title")}
           </Typography>
           <img src={AppTitleColored} alt="X Game Room" width={200} />
         </Box>
 
         <Box flex={1}>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            Enter your university email to receive a registration link
+            {t("registration.emailPrompt")}
           </Typography>
           <TextField
-            label="Email"
+            label={t("common.email")}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -68,10 +70,10 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
         </Box>
         <Box sx={styles.buttons}>
           <Button variant="contained" onClick={handleSend}>
-            Send
+            {t("registration.send")}
           </Button>
           <Button variant="outlined" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         </Box>
       </Box>

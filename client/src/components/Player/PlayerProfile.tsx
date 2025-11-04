@@ -6,8 +6,10 @@ import { useContext, useEffect, useState } from "react";
 import { usePrompt } from "../../hooks/usePrompt";
 import { enqueueSnackbar } from "notistack";
 import { LoaderContext } from "../../context/LoaderProvider";
+import { useTranslation } from "react-i18next";
 
 const PlayerProfile = () => {
+  const { t } = useTranslation();
   const { setLoading } = useContext(LoaderContext);
   const { playerInfo, loading, setPlayerInfo } = usePlayerInfo();
 
@@ -26,12 +28,12 @@ const PlayerProfile = () => {
         .then((updatedPlayer) => {
           setPlayerInfo(updatedPlayer);
           setOriginalPlayerInfo(updatedPlayer);
-          enqueueSnackbar("Player info updated successfully", {
+          enqueueSnackbar(t("notify.profileUpdated"), {
             variant: "success",
           });
         })
         .catch((err) => {
-          enqueueSnackbar("Error updating player info", {
+          enqueueSnackbar(t("errors.profileUpdateFailed"), {
             variant: "error",
           });
           console.error("Error updating player info. Please try again later.", err);
@@ -44,18 +46,18 @@ const PlayerProfile = () => {
 
   const isChanged = false; // No editable fields for now
 
-  usePrompt("You have unsaved changes. Are you sure you want to leave?", isChanged);
+  usePrompt(t("common.unsavedChangesPrompt"), isChanged);
 
   return (
     <>
       <Box sx={styles.container}>
         <Box>
-          <Typography sx={styles.title}>Profile</Typography>
+          <Typography sx={styles.title}>{t("nav.profile")}</Typography>
           <Box sx={styles.form}>
             <TextField
               id="outlined-helperText"
-              label="Email"
-              value={loading ? "Loading..." : playerInfo?.email || ""}
+              label={t("common.email")}
+              value={loading ? t("common.loading") : playerInfo?.email || ""}
               variant="standard"
               disabled
             />
@@ -80,7 +82,7 @@ const PlayerProfile = () => {
       </Box>
       <Box sx={styles.formButtons}>
         <Button variant="contained" onClick={handleUpdatePlayerInfo} disabled={!isChanged}>
-          Save
+          {t("common.save")}
         </Button>
         <Button
           variant="outlined"
@@ -89,7 +91,7 @@ const PlayerProfile = () => {
             setPlayerInfo(originalPlayerInfo!);
           }}
         >
-          Cancel
+          {t("common.cancel")}
         </Button>
       </Box>
     </>

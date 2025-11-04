@@ -23,6 +23,7 @@ namespace gameroombookingsys.DTOs
             PlayerId = roomBooking.PlayerId;
             PassCode = roomBooking.PassCode;
             IsPassCodeValid = roomBooking.IsPassCodeValid;
+            PlayerEmail = roomBooking.Player?.Email;
         }
 
         public int Id { get; set; }
@@ -37,5 +38,6 @@ namespace gameroombookingsys.DTOs
         public int PlayerId { get; set; }
         public string? PassCode { get; set; }
         public bool IsPassCodeValid { get; set; }
+        public string? PlayerEmail { get; set; }
     }
 }
