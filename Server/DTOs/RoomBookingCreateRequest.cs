@@ -15,6 +15,9 @@ namespace gameroombookingsys.DTOs
         public int Fellows { get; set; } = 0;
 
         public List<int> DeviceIds { get; set; } = new List<int>();
+
+        // Optional: Admin can specify playerId when creating booking for another user
+        public int? PlayerId { get; set; }
     }
 }
 

@@ -35,7 +35,7 @@ namespace gameroombookingsys.DTOs
         public bool isPlayingAlone { get; set; }
         public int Fellows { get; set; }
         public BookingStatus Status { get; set; } = BookingStatus.Upcoming;
-        public int PlayerId { get; set; }
+        public int? PlayerId { get; set; }
         public string? PassCode { get; set; }
         public bool IsPassCodeValid { get; set; }
         public string? PlayerEmail { get; set; }

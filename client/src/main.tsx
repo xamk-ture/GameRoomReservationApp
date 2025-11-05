@@ -35,7 +35,7 @@ createRoot(document.getElementById("root")!).render(
     <PlayerInfoProvider>
       <I18nProvider>
         <LoaderProvider>
-          <SnackbarProvider>
+          <SnackbarProvider maxSnack={3} autoHideDuration={4000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
             <ThemeProvider theme={appTheme}>
               <CssBaseline />
               <StrictMode>

@@ -1,6 +1,7 @@
 import { Box, Typography, Dialog, DialogTitle } from "@mui/material";
 import { RoomBookingDto, RoomBookingsService } from "../../api";
-import { useContext, useEffect, useState } from "react";
+import { OpenAPI } from "../../api/core/OpenAPI";
+import { useContext, useEffect, useState, useMemo } from "react";
 import { api, BookingStatus, DeviceDto } from "../../api/api";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc"; // Importing the utc plugin for dayjs
@@ -24,6 +25,11 @@ const initialBooking: RoomBookingDto = {
 
 const Bookings = () => {
   const { t } = useTranslation();
+  
+  // Create localized version of getStatusTooltip
+  const getLocalizedStatusTooltip = (status: string) => {
+    return getStatusTooltip(status, t);
+  };
   const { enqueueSnackbar } = useSnackbar();
   const { playerInfo } = usePlayerInfo();
   const { setLoading } = useContext(LoaderContext);
@@ -68,7 +74,9 @@ const Bookings = () => {
       });
   }, []);
 
-  const bookedEvents = calendar.map((booking) => {
+  const bookedEvents = calendar
+    .filter((booking) => booking.status !== BookingStatus.CANCELLED)
+    .map((booking) => {
     const start = booking.bookingDateTime
       ? new Date(booking.bookingDateTime)
       : new Date();
@@ -88,32 +96,89 @@ const Bookings = () => {
     };
   });
 
-  // Fetch free time events for the next 7 days and store in state.
+  // Fetch free time events for the next 14 days using date range endpoint for faster loading
   useEffect(() => {
     const fetchFreeTimeEvents = async () => {
-      const ftEvents: any[] = [];
-      for (let i = 0; i < 14; i++) {
-        const day = new Date();
-        day.setDate(day.getDate() + i);
-        const freeIntervals = await RoomBookingsService.getFreeTimeEventsForDay(
-          day.toISOString()
+      // Use local date to avoid timezone issues
+      const today = new Date();
+      const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 13); // 14 days total (0-13)
+      
+      // Format dates as YYYY-MM-DD (ISO date format without time)
+      const formatDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
+      
+      try {
+        const base = (OpenAPI as any).BASE || "";
+        const headers = { ...(OpenAPI as any).HEADERS } as Record<string, string>;
+        const response = await fetch(
+          `${base}/api/gameroombookings/free-time-events-range?startDate=${startDateStr}&endDate=${endDateStr}`,
+          { headers }
         );
-        ftEvents.push(
-          ...freeIntervals.map((interval) => ({
-            start: interval.start,
-            end: interval.end,
-            display: interval.display,
-            backgroundColor: interval.color,
-          }))
+        
+        if (!response.ok) {
+          // Try to get error message from response body
+          let errorMessage = response.statusText;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.Message || response.statusText;
+          } catch {
+            // If response is not JSON, use statusText
+          }
+          throw new Error(`Failed to fetch free time events: ${errorMessage}`);
+        }
+        
+        const freeIntervals = await response.json();
+        const ftEvents = freeIntervals.map((interval: any) => ({
+          start: interval.start,
+          end: interval.end,
+          display: interval.display,
+          backgroundColor: interval.color,
+        }));
+        setFreeTimeEvents(ftEvents);
+      } catch (error) {
+        console.error("Error fetching free time events:", error);
+        // Fallback to parallel requests if range endpoint fails
+        const days = Array.from({ length: 14 }, (_, i) => {
+          const day = new Date();
+          day.setDate(day.getDate() + i);
+          return day.toISOString();
+        });
+        const promises = days.map(day => 
+          RoomBookingsService.getFreeTimeEventsForDay(day)
         );
+        try {
+          const results = await Promise.all(promises);
+          const ftEvents = results.flatMap(freeIntervals =>
+            freeIntervals.map((interval: any) => ({
+              start: interval.start,
+              end: interval.end,
+              display: interval.display,
+              backgroundColor: interval.color,
+            }))
+          );
+          setFreeTimeEvents(ftEvents);
+        } catch (fallbackError) {
+          console.error("Error in fallback fetching:", fallbackError);
+        }
       }
-      setFreeTimeEvents(ftEvents);
     };
     fetchFreeTimeEvents();
   }, []);
 
   // Merge free time background events with booked events.
-  const events = [...freeTimeEvents, ...bookedEvents];
+  // Memoize events array to prevent unnecessary calendar re-renders
+  const events = useMemo(() => {
+    return [...freeTimeEvents, ...bookedEvents];
+  }, [freeTimeEvents, bookedEvents]);
 
   // Open modal to create a new booking when a day cell is clicked
   const handleCreateNewBooking = (arg: any) => {
@@ -121,6 +186,8 @@ const Bookings = () => {
       ...initialBooking,
       // Pre-fill the date with the clicked cell date
       bookingDateTime: dayjs(arg.date).format("YYYY-MM-DDTHH:mm"),
+      // Set default duration to 1 hour so validation works immediately
+      duration: 1,
     });
     setModalMode(ModalMode.CREATE);
     setSelectedBooking(null);
@@ -174,13 +241,15 @@ const Bookings = () => {
       setBookRoom((prev) => ({
         ...prev,
         isPlayingAlone: checked,
-        fellows: checked ? 0 : prev.fellows,
+        // When not playing alone, set fellows to 1 by default
+        fellows: checked ? 0 : (prev.fellows ?? 1),
       }));
     } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
       setSelectedBooking({
         ...selectedBooking,
         isPlayingAlone: checked,
-        fellows: checked ? 0 : selectedBooking.fellows,
+        // When not playing alone, set fellows to 1 by default
+        fellows: checked ? 0 : (selectedBooking.fellows ?? 1),
       });
     }
   };
@@ -196,66 +265,85 @@ const Bookings = () => {
 
   const handleDeviceChange = (deviceId: number, checked: boolean) => {
     if (modalMode === ModalMode.CREATE) {
-      const currentDevices = bookRoom.devices ?? [];
       if (checked) {
         const device = allDevices.find(d => d.id === deviceId);
         if (device) {
           setBookRoom({
             ...bookRoom,
-            devices: [...currentDevices, device],
+            devices: [device],
           });
         }
       } else {
         setBookRoom({
           ...bookRoom,
-          devices: currentDevices.filter(d => d.id !== deviceId),
+          devices: [],
         });
       }
     } else if (modalMode === ModalMode.UPDATE && selectedBooking) {
-      const currentDevices = selectedBooking.devices ?? [];
       if (checked) {
         const device = allDevices.find(d => d.id === deviceId);
         if (device) {
           setSelectedBooking({
             ...selectedBooking,
-            devices: [...currentDevices, device],
+            devices: [device],
           });
         }
       } else {
         setSelectedBooking({
           ...selectedBooking,
-          devices: currentDevices.filter(d => d.id !== deviceId),
+          devices: [],
         });
       }
     }
   };
 
   const checkFieldsValidation = (): boolean => {
-    const isBookingDateTimeValid =
-      bookRoom.bookingDateTime !== initialBooking.bookingDateTime;
+    // Determine which booking object to validate (CREATE or UPDATE mode)
+    const bookingToValidate = modalMode === ModalMode.CREATE ? bookRoom : selectedBooking;
+    if (!bookingToValidate) return false;
 
-    const durationNumber = parseInt(String(bookRoom.duration ?? ""), 10);
+    // Check if booking date/time is set and valid
+    const isBookingDateTimeValid = 
+      !!bookingToValidate.bookingDateTime && 
+      dayjs(bookingToValidate.bookingDateTime).isValid();
+
+    // Check if duration is valid (0.5, 1, 1.5, or 2 hours)
+    // Duration can be undefined initially, but if it's set, it must be valid
+    const durationNumber = Number(bookingToValidate.duration ?? 0);
     const isDurationValid =
-      !isNaN(durationNumber) &&
       durationNumber > 0 &&
-      bookRoom.duration !== initialBooking.duration;
+      durationNumber >= 0.5 &&
+      durationNumber <= 2 &&
+      Math.abs(durationNumber * 2 - Math.round(durationNumber * 2)) < 1e-9;
 
-    const isFellowsValid =
-      bookRoom.isPlayingAlone ||
-      (bookRoom.fellows !== undefined &&
-        bookRoom.fellows > 0 &&
-        bookRoom.fellows !== initialBooking.fellows);
+    // Check fellows: 
+    // - If playing alone, fellows must be 0
+    // - If not playing alone, fellows must be >= 1
+    const isPlayingAlone = bookingToValidate.isPlayingAlone ?? true;
+    const fellows = bookingToValidate.fellows ?? 0;
+    const isFellowsValid = isPlayingAlone 
+      ? fellows === 0 
+      : (fellows >= 1);
 
-    return isBookingDateTimeValid && isDurationValid && isFellowsValid;
+    // Must have exactly one device selected
+    const hasOneDevice = (bookingToValidate.devices?.length || 0) === 1;
+
+    return isBookingDateTimeValid && isDurationValid && isFellowsValid && hasOneDevice;
   };
 
   const checkFieldsChange = () => {
     if (!originalBooking || !selectedBooking) return false;
+    
+    // Check if device ID changed (compare first device ID)
+    const originalDeviceId = originalBooking.devices?.[0]?.id;
+    const selectedDeviceId = selectedBooking.devices?.[0]?.id;
+    const deviceChanged = originalDeviceId !== selectedDeviceId;
+    
     return (
       (selectedBooking.bookingDateTime?.trim() || "") !==
         (originalBooking.bookingDateTime?.trim() || "") ||
       selectedBooking.duration !== originalBooking.duration ||
-      selectedBooking.devices?.length !== originalBooking.devices?.length ||
+      deviceChanged ||
       selectedBooking.isPlayingAlone !== originalBooking.isPlayingAlone ||
       selectedBooking.fellows !== originalBooking.fellows
     );
@@ -265,19 +353,38 @@ const Bookings = () => {
     if (checkFieldsValidation()) {
       setLoading(true);
       try {
-        const response = await api.RoomBookingsService.bookGameRoom(bookRoom);
+        // Send the create request in the same shape as Admin view (uses deviceIds)
+        const base = (OpenAPI as any).BASE || "";
+        const headers = { ...(OpenAPI as any).HEADERS, "Content-Type": "application/json" } as Record<string, string>;
+        const deviceId = bookRoom.devices && bookRoom.devices[0] ? bookRoom.devices[0].id : undefined;
+        const response = await fetch(`${base}/api/gameroombookings/bookgameroom`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            bookingDateTime: bookRoom.bookingDateTime,
+            duration: Number(bookRoom.duration),
+            fellows: bookRoom.fellows ?? 0,
+            isPlayingAlone: bookRoom.isPlayingAlone ?? true,
+            deviceIds: deviceId ? [deviceId] : [],
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}: ${response.statusText}` }));
+          throw new Error(errorData.message || errorData.Message || `Failed to create booking: ${response.statusText}`);
+        }
+
+        // Fetch the player's bookings again to get the new one
+        if (playerInfo?.id) {
+          const fetched = await api.RoomBookingsService.getRoomBookingsByPlayerId(playerInfo.id);
+          setCalendar(Array.isArray(fetched) ? fetched : []);
+        }
         enqueueSnackbar(
           t("notify.roomBookedSuccess", {
             date: dayjs(bookRoom.bookingDateTime).format("MMMM D, YYYY h:mm A")
           }),
-          { variant: "success" }
+          { variant: "success", autoHideDuration: 4000 }
         );
-
-        const freshBooking = await api.RoomBookingsService.getRoomBookingById(
-          response.id!
-        );
-        // Add the new booking to the calendar state
-        setCalendar((prev) => [...prev, freshBooking]);
 
         // Reset fields
         setBookRoom(initialBooking);
@@ -285,13 +392,22 @@ const Bookings = () => {
         // Close modal
         setModalOpen(false);
       } catch (error: any) {
-        const serverMessage = error?.body?.message || error?.body?.Message;
-
-        if (serverMessage) {
-          enqueueSnackbar(serverMessage, { variant: "error" });
-        } else {
-          enqueueSnackbar("Error booking room", { variant: "error" });
+        // Extract error message from various possible error formats
+        const serverMessage = error?.message || error?.body?.message || error?.body?.Message || error?.Message;
+        
+        // Map common English error messages to translation keys
+        let translationKey = "errors.bookingFailed";
+        if (serverMessage?.includes("Selected device is not available") || serverMessage?.includes("not available")) {
+          translationKey = "errors.deviceNotAvailable";
+        } else if (serverMessage?.includes("Exactly one device must be selected")) {
+          translationKey = "errors.deviceRequired";
+        } else if (serverMessage?.includes("Duration must be")) {
+          translationKey = "errors.invalidDuration";
+        } else if (serverMessage?.includes("Booking date/time must be")) {
+          translationKey = "errors.invalidDateTime";
         }
+
+        enqueueSnackbar(t(translationKey), { variant: "error", autoHideDuration: 5000 });
         console.error("Error booking room:", error);
       } finally {
         setLoading(false);
@@ -304,17 +420,20 @@ const Bookings = () => {
 
     setLoading(true);
     try {
-      const payload = {
-        ...selectedBooking,
-        devices: selectedBooking.devices || [],
-      };
-      const updated = await api.RoomBookingsService.updateRoomBooking(
-        selectedBooking.id,
-        payload
-      );
-
-      // Merge the devices from payload to the response.
-      const updatedBooking = { ...updated, devices: payload.devices };
+      const base = (OpenAPI as any).BASE || "";
+      const headers = { ...(OpenAPI as any).HEADERS, "Content-Type": "application/json" } as Record<string, string>;
+      const deviceId = selectedBooking.devices && selectedBooking.devices[0] ? selectedBooking.devices[0].id : undefined;
+      await fetch(`${base}/api/gameroombookings/booking/${selectedBooking.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          bookingDateTime: selectedBooking.bookingDateTime,
+          duration: Number(selectedBooking.duration),
+          isPlayingAlone: selectedBooking.isPlayingAlone ?? true,
+          fellows: selectedBooking.fellows ?? 0,
+          deviceIds: deviceId ? [deviceId] : [],
+        }),
+      }).then(async (r) => { if (!r.ok) throw await r.json().catch(() => new Error(t("errors.badRequest"))); });
 
       // Re-fetch the bookings.
       const fetchedBookings =
@@ -325,21 +444,22 @@ const Bookings = () => {
       const updatedBookings = (
         Array.isArray(fetchedBookings) ? fetchedBookings : []
       ).map((booking) =>
-        booking.id === updatedBooking.id
-          ? { ...booking, devices: updatedBooking.devices }
+        booking.id === selectedBooking.id
+          ? { ...booking, devices: selectedBooking.devices }
           : booking
       );
       setCalendar(updatedBookings);
-      setSelectedBooking(updatedBooking);
+      setSelectedBooking({ ...selectedBooking });
         enqueueSnackbar(
           t("notify.bookingUpdatedSuccess", {
             date: dayjs(selectedBooking.bookingDateTime).format("MMMM D, YYYY h:mm A")
           }),
-          { variant: "success" }
+          { variant: "success", autoHideDuration: 4000 }
         );
       setModalOpen(false);
     } catch (error: any) {
-      enqueueSnackbar(t("errors.bookingUpdateFailed"), { variant: "error" });
+      const serverMessage = error?.Message || error?.message;
+      enqueueSnackbar(serverMessage || t("errors.bookingUpdateFailed"), { variant: "error", autoHideDuration: 5000 });
       console.error("Error updating booking:", error);
     } finally {
       setLoading(false);
@@ -348,21 +468,26 @@ const Bookings = () => {
 
   const onCancelBooking = async () => {
     if (!selectedBooking || !selectedBooking.id) return;
-    // Update the booking status to cancelled
     const confirmCancel = window.confirm(t("bookings.confirmCancel"));
     if (!confirmCancel) return;
-    const updatedBooking = {
-      ...selectedBooking,
-      status: BookingStatus.CANCELLED,
-    };
     setLoading(true);
     try {
-      await api.RoomBookingsService.updateRoomBooking(
-        selectedBooking.id,
-        updatedBooking
-      );
+      const base = (OpenAPI as any).BASE || "";
+      const headers = { ...(OpenAPI as any).HEADERS } as Record<string, string>;
+      const response = await fetch(`${base}/api/gameroombookings/my/${selectedBooking.id}`, {
+        method: "DELETE",
+        headers,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ Message: `HTTP ${response.status}: ${response.statusText}` }));
+        throw new Error(errorData.Message || errorData.message || `Failed to delete booking: ${response.statusText}`);
+      }
+      
+      await response.json().catch(() => ({}));
       enqueueSnackbar(t("notify.bookingCancelled"), {
         variant: "success",
+        autoHideDuration: 4000,
       });
       setModalOpen(false);
       if (playerInfo && playerInfo.id) {
@@ -370,7 +495,8 @@ const Bookings = () => {
         setCalendarKey((prevKey) => prevKey + 1); // Force re-render of calendar
       }
     } catch (error: any) {
-      enqueueSnackbar(t("errors.bookingCancelFailed"), { variant: "error" });
+      const serverMessage = error?.Message || error?.message || error?.toString();
+      enqueueSnackbar(serverMessage || t("errors.bookingCancelFailed"), { variant: "error", autoHideDuration: 5000 });
       console.error("Error cancelling booking:", error);
     } finally {
       setLoading(false);
@@ -385,20 +511,23 @@ const Bookings = () => {
     setLoading(true);
     try {
       await api.RoomBookingsService.deleteBooking(selectedBooking.id);
-      enqueueSnackbar(t("notify.bookingDeleted"), { variant: "success" });
+      enqueueSnackbar(t("notify.bookingDeleted"), { variant: "success", autoHideDuration: 4000 });
       setModalOpen(false);
       if (playerInfo && playerInfo.id) {
         fetchPlayerBookings(playerInfo.id);
       }
     } catch (error: any) {
-      enqueueSnackbar(t("errors.bookingDeleteFailed"), { variant: "error" });
+      enqueueSnackbar(t("errors.bookingDeleteFailed"), { variant: "error", autoHideDuration: 5000 });
       console.error("Error deleting booking:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const isChanged = checkFieldsValidation() || checkFieldsChange();
+  // Memoize isChanged to prevent unnecessary re-renders and multiple blockers
+  const isChanged = useMemo(() => {
+    return checkFieldsValidation() || checkFieldsChange();
+  }, [bookRoom, selectedBooking, originalBooking, modalMode]);
 
   usePrompt(t("common.unsavedChangesPrompt"), isChanged);
 
@@ -410,7 +539,7 @@ const Bookings = () => {
         events={events}
         onCreateNewBooking={handleCreateNewBooking}
         onShowExistingBooking={handleShowExistingBooking}
-        getStatusTooltip={getStatusTooltip}
+        getStatusTooltip={getLocalizedStatusTooltip}
       />
       {/* Dialog for creating/editing bookings */}
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} fullWidth maxWidth="sm">
@@ -430,6 +559,7 @@ const Bookings = () => {
           }
           allDevices={allDevices}
           selectedBooking={selectedBooking}
+          allBookings={calendar}
           onBookingDateTimeChange={handleBookingDateTimeChange}
           onDurationChange={handleDurationChange}
           onPlayingAloneChange={handlePlayingAloneChange}
