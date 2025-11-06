@@ -33,6 +33,127 @@ namespace gameroombookingsys.Repository
             return !overlapExists;
         }
 
+        public async Task<bool> IsDeviceAvailable(DateTime startTime, double duration, int deviceId)
+        {
+            var requestedEndTime = startTime.AddHours(duration);
+
+            var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == deviceId);
+            if (device == null || (device.Quantity ?? 0) <= 0)
+            {
+                return false;
+            }
+
+            // Fetch bookings that overlap the requested window and include their devices
+            var overlappingBookings = await _context.RoomBookings
+                .Include(b => b.Devices)
+                .Where(b => b.Status != BookingStatus.Cancelled &&
+                            b.BookingDateTime < requestedEndTime)
+                .ToListAsync();
+
+            // Count how many of these overlapping bookings actually overlap in time and use the same device
+            int concurrentCount = overlappingBookings
+                .Count(b => b.BookingDateTime.AddHours(b.Duration) > startTime &&
+                            b.Devices.Any(d => d.Id == deviceId));
+
+            return concurrentCount < (device.Quantity ?? 0);
+        }
+
+        public async Task<bool> IsDeviceAvailableExcludingBooking(DateTime startTime, double duration, int deviceId, int excludeBookingId)
+        {
+            var requestedEndTime = startTime.AddHours(duration);
+
+            var device = await _context.Devices.FirstOrDefaultAsync(d => d.Id == deviceId);
+            if (device == null || (device.Quantity ?? 0) <= 0)
+            {
+                return false;
+            }
+
+            // Fetch bookings that overlap the requested window and include their devices, excluding the specified booking
+            var overlappingBookings = await _context.RoomBookings
+                .Include(b => b.Devices)
+                .Where(b => b.Status != BookingStatus.Cancelled &&
+                            b.Id != excludeBookingId &&
+                            b.BookingDateTime < requestedEndTime)
+                .ToListAsync();
+
+            // Count how many of these overlapping bookings actually overlap in time and use the same device
+            int concurrentCount = overlappingBookings
+                .Count(b => b.BookingDateTime.AddHours(b.Duration) > startTime &&
+                            b.Devices.Any(d => d.Id == deviceId));
+
+            return concurrentCount < (device.Quantity ?? 0);
+        }
+
+        public async Task<List<DeviceAvailabilityDto>> GetDeviceAvailabilities(DateTime startTime, double duration)
+        {
+            try
+            {
+                var requestedEndTime = startTime.AddHours(duration);
+
+                // Get all devices
+                var allDevices = await _context.Devices.ToListAsync();
+                _logger.LogInformation("GetDeviceAvailabilities: Found {Count} devices, startTime: {StartTime}, duration: {Duration}", 
+                    allDevices.Count, startTime, duration);
+
+                // Fetch bookings that might overlap the requested window
+                var overlappingBookings = await _context.RoomBookings
+                    .Include(b => b.Devices)
+                    .Where(b => b.Status != BookingStatus.Cancelled &&
+                                b.BookingDateTime < requestedEndTime)
+                    .ToListAsync();
+
+                _logger.LogInformation("GetDeviceAvailabilities: Found {Count} overlapping bookings", overlappingBookings.Count);
+
+                var availabilities = new List<DeviceAvailabilityDto>();
+
+                _logger.LogInformation("GetDeviceAvailabilities: Processing {DeviceCount} devices", allDevices.Count);
+                
+                foreach (var device in allDevices)
+                {
+                    if (device == null)
+                    {
+                        _logger.LogWarning("GetDeviceAvailabilities: Skipping null device");
+                        continue;
+                    }
+                    
+                    var totalQuantity = device.Quantity ?? 0;
+                    _logger.LogDebug("GetDeviceAvailabilities: Processing device {DeviceId} ({DeviceName}), quantity: {Quantity}", 
+                        device.Id, device.Name, totalQuantity);
+                    
+                    // Count how many bookings use this device during the requested time
+                    // Safely handle null Devices collections
+                    int bookedCount = overlappingBookings
+                        .Where(b => b != null && 
+                                    b.BookingDateTime.AddHours(b.Duration) > startTime &&
+                                    b.Devices != null)
+                        .Count(b => b.Devices.Any(d => d != null && d.Id == device.Id));
+
+                    int availableQuantity = Math.Max(0, totalQuantity - bookedCount);
+
+                    var availabilityDto = new DeviceAvailabilityDto
+                    {
+                        DeviceId = device.Id,
+                        DeviceName = device.Name ?? $"Device {device.Id}",
+                        TotalQuantity = totalQuantity,
+                        AvailableQuantity = availableQuantity
+                    };
+                    
+                    availabilities.Add(availabilityDto);
+                    _logger.LogDebug("GetDeviceAvailabilities: Added availability for device {DeviceId}: {Available}/{Total}", 
+                        device.Id, availableQuantity, totalQuantity);
+                }
+
+                _logger.LogInformation("GetDeviceAvailabilities: Returning {Count} availabilities", availabilities.Count);
+                return availabilities;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetDeviceAvailabilities. startTime: {StartTime}, duration: {Duration}", startTime, duration);
+                // Return empty list instead of throwing to prevent 500 errors
+                return new List<DeviceAvailabilityDto>();
+            }
+        }
+
         public async Task<RoomBooking> AddRoomBooking(RoomBooking booking)
         {
             try
