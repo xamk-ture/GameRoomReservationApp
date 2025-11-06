@@ -10,18 +10,21 @@ namespace gameroombookingsys.Service
     {
         private readonly IOneTimeLoginCodesRepository _codesRepository;
         private readonly IUsersRepository _usersRepository;
+        private readonly IEmailService _emailService;
         private readonly ILogger<AuthService> _logger;
 
         private readonly IConfiguration _configuration;
 
         public AuthService(
             IOneTimeLoginCodesRepository codesRepository, 
-            IUsersRepository usersRepository, 
+            IUsersRepository usersRepository,
+            IEmailService emailService,
             ILogger<AuthService> logger,
             IConfiguration configuration)
         {
             _codesRepository = codesRepository;
             _usersRepository = usersRepository;
+            _emailService = emailService;
             _logger = logger;
             _configuration = configuration;
         }
@@ -47,6 +50,20 @@ namespace gameroombookingsys.Service
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            // Send email with login code
+            try
+            {
+                // Default to Finnish, but could be determined from user preferences or request headers
+                string language = "fi";
+                await _emailService.SendLoginCodeAsync(email, code, language);
+                _logger.LogInformation("Login code email sent successfully to {Email}", email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send login code email to {Email}", email);
+                // Don't throw - code is still generated and stored, user can request it again if needed
+            }
 
             return (email, code, expiresAt);
         }

@@ -35,4 +35,10 @@
     <PackageReference Include="Npgsql" Version="9.0.*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Templates\*.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
