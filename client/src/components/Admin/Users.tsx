@@ -134,7 +134,7 @@ const AdminUsers = () => {
               const base = (OpenAPI as any).BASE || "";
               const headers = { ...(OpenAPI as any).HEADERS, "Content-Type": "application/json" } as Record<string, string>;
               const resp = await fetch(`${base}/api/admin/users`, { method: "DELETE", headers, body: JSON.stringify({ emails: selectedEmails }) });
-              if (!resp.ok) throw await resp.json().catch(() => new Error("Delete failed"));
+              if (!resp.ok) throw await resp.json().catch(() => new Error(t("errors.deleteFailed")));
               setConfirmOpen(false);
               setSelectedEmails([]);
               // reload lists

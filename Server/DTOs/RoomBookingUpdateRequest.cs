@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using gameroombookingsys.Enums;
 
 namespace gameroombookingsys.DTOs
 {
@@ -15,6 +16,8 @@ namespace gameroombookingsys.DTOs
         public int Fellows { get; set; } = 0;
 
         public List<int> DeviceIds { get; set; } = new List<int>();
+
+        public BookingStatus? Status { get; set; }
     }
 }
 

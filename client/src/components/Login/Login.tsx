@@ -83,10 +83,10 @@ const Login: React.FC = () => {
       }
 
       setCodeSent(true);
-      enqueueSnackbar(t("notify.codeSent"), { variant: "success" });
+      enqueueSnackbar(t("notify.codeSent"), { variant: "success", autoHideDuration: 4000 });
     } catch (e: any) {
       setError(t("errors.generic"));
-      enqueueSnackbar(t("notify.sendFailed"), { variant: "error" });
+      enqueueSnackbar(t("notify.sendFailed"), { variant: "error", autoHideDuration: 5000 });
     } finally {
       setIsSending(false);
     }
@@ -137,7 +137,7 @@ const Login: React.FC = () => {
       }
     } catch (e: any) {
       setError(t("errors.generic"));
-      enqueueSnackbar(t("notify.verifyFailed"), { variant: "error" });
+      enqueueSnackbar(t("notify.verifyFailed"), { variant: "error", autoHideDuration: 5000 });
     } finally {
       setIsVerifying(false);
     }

@@ -24,11 +24,11 @@ var pgConnectionString = builder.Configuration.GetConnectionString("PostgresConn
 var runningInContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER");
 if (string.Equals(runningInContainer, "true", StringComparison.OrdinalIgnoreCase))
 {
-    var csbAdjust = new NpgsqlConnectionStringBuilder(pgConnectionString);
-    if (csbAdjust.Host == "localhost" || csbAdjust.Host == "127.0.0.1")
+    var connectionStringBuilder = new NpgsqlConnectionStringBuilder(pgConnectionString);
+    if (connectionStringBuilder.Host == "localhost" || connectionStringBuilder.Host == "127.0.0.1")
     {
-        csbAdjust.Host = "host.docker.internal";
-        pgConnectionString = csbAdjust.ConnectionString;
+        connectionStringBuilder.Host = "host.docker.internal";
+        pgConnectionString = connectionStringBuilder.ConnectionString;
     }
 }
 

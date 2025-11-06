@@ -65,10 +65,10 @@ namespace Gameroombookingsys.Repository
                 .ToList();
             if (list.Count == 0) return 0;
 
-            var strategy = _context.Database.CreateExecutionStrategy();
-            return await strategy.ExecuteAsync(async () =>
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            return await executionStrategy.ExecuteAsync(async () =>
             {
-                using var tx = await _context.Database.BeginTransactionAsync();
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
                 // Find players by email
                 var players = await _context.Players
@@ -100,13 +100,13 @@ namespace Gameroombookingsys.Repository
                     .ToListAsync();
                 if (users.Count == 0)
                 {
-                    await tx.CommitAsync();
+                    await transaction.CommitAsync();
                     return 0;
                 }
 
                 _context.Users.RemoveRange(users);
                 var deleted = await _context.SaveChangesAsync();
-                await tx.CommitAsync();
+                await transaction.CommitAsync();
                 return deleted;
             });
         }

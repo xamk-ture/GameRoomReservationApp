@@ -33,7 +33,7 @@ const AdminDevices = () => {
     }
     setSelected([]);
     await load();
-    setSnack("Deleted selected devices");
+    setSnack(t("admin.devices.deletedSelected"));
   };
 
   const openCreate = () => {
@@ -53,7 +53,7 @@ const AdminDevices = () => {
 
   const submit = async () => {
     if (!validate()) {
-      setSnack("Name is required (min 2 chars)");
+      setSnack(t("admin.devices.nameRequired"));
       return;
     }
     if (editing) {
@@ -64,7 +64,7 @@ const AdminDevices = () => {
         quantity: form.quantity,
         status: (form.available ? "Available" : "Unavailable") as any,
       });
-      setSnack("Device updated");
+      setSnack(t("admin.devices.deviceUpdated"));
     } else {
       await api.DevicesService.addDevice({
         name: form.name,
@@ -72,7 +72,7 @@ const AdminDevices = () => {
         quantity: form.quantity,
         status: (form.available ? "Available" : "Unavailable") as any,
       });
-      setSnack("Device created");
+      setSnack(t("admin.devices.deviceCreated"));
     }
     setOpen(false);
     await load();
@@ -88,8 +88,9 @@ const AdminDevices = () => {
           <TableHead>
             <TableRow>
               <TableCell width={24} />
-              <TableCell>{t("common.id")}</TableCell>
               <TableCell>{t("admin.devices.name")}</TableCell>
+              <TableCell>{t("admin.devices.description")}</TableCell>
+              <TableCell>{t("admin.devices.quantity")}</TableCell>
               <TableCell>{t("admin.devices.status")}</TableCell>
               <TableCell align="right">{t("common.actions")}</TableCell>
             </TableRow>
@@ -102,9 +103,10 @@ const AdminDevices = () => {
                     setSelected((prev) => e.target.checked ? [...prev, d.id!] : prev.filter(x => x !== d.id));
                   }} />
                 </TableCell>
-                <TableCell>{d.id}</TableCell>
                 <TableCell>{d.name}</TableCell>
-                <TableCell>{(d.status as any) === "Available" ? "Available" : "Unavailable"}</TableCell>
+                <TableCell>{d.description || ""}</TableCell>
+                <TableCell>{d.quantity ?? 0}</TableCell>
+                <TableCell>{(d.status as any) === "Available" ? t("admin.devices.statusAvailable") : t("admin.devices.statusUnavailable")}</TableCell>
                 <TableCell align="right">
                   <Button sx={{ mr: 1 }} variant="text" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
                   <Button color="error" variant="outlined" onClick={() => handleDelete(d.id!)}>{t("common.delete")}</Button>
@@ -129,7 +131,13 @@ const AdminDevices = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!snack} message={snack || ""} autoHideDuration={2000} onClose={() => setSnack(null)} />
+      <Snackbar 
+        open={!!snack} 
+        message={snack || ""} 
+        autoHideDuration={2000} 
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      />
     </Box>
   );
 };

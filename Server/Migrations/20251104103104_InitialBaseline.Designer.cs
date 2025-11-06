@@ -12,8 +12,8 @@ using gameroombookingsys;
 namespace gameroombookingsys.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251020084038_UpdateDatabaseSchema")]
-    partial class UpdateDatabaseSchema
+    [Migration("20251104103104_InitialBaseline")]
+    partial class InitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -135,14 +135,6 @@ namespace gameroombookingsys.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("PictureUrl")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Theme")
                         .IsRequired()
                         .HasColumnType("text");
 

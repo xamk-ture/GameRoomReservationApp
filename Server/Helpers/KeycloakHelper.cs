@@ -19,11 +19,13 @@ namespace gameroombookingsys.Helpers
             var user = _httpContextAccessor.HttpContext?.User;
             if (user == null) return null;
 
-            // Log all claims for debugging purposes (or use a debugger)
+            // Log all claims for debugging purposes (only in debug mode)
+            #if DEBUG
             foreach (var claim in user.Claims)
             {
-                Console.WriteLine($"Claim Type: {claim.Type}, Value: {claim.Value}");
+                System.Diagnostics.Debug.WriteLine($"Claim Type: {claim.Type}, Value: {claim.Value}");
             }
+            #endif
 
             // Try different claim names:
             var emailClaim = user.Claims.FirstOrDefault(c => c.Type.Equals("email", StringComparison.OrdinalIgnoreCase))

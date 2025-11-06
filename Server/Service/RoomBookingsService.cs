@@ -36,28 +36,43 @@ namespace gameroombookingsys.Service
         {
             try
             {
-                // Get the authenticated user's email from the HttpContext via KeycloakHelper
-                var email = _keycloakHelper.GetUserEmail();
-                if (string.IsNullOrEmpty(email))
-                    throw new Exception("User not authenticated.");
+                Player? player = null;
 
-                // Look up the player by email
-                var player = await _playersRepository.GetPlayerByEmail(email);
-                if (player == null)
+                // If PlayerId is provided in the request (admin creating booking for another user), use it
+                // Otherwise, authenticate and use the authenticated player's ID
+                if (dto.PlayerId.HasValue && dto.PlayerId.Value > 0)
                 {
-                    // Auto-create minimal Player record for first-time authenticated users
-                    player = await _playersRepository.AddPlayer(new Player
-                    {
-                        Email = email,
-                    });
+                    // Admin is creating booking for another user - verify the player exists
+                    player = await _playersRepository.GetPlayerById(dto.PlayerId.Value);
+                    if (player == null)
+                        throw new KeyNotFoundException($"Player with ID {dto.PlayerId.Value} not found.");
+                    dto.PlayerId = player.Id;
                 }
+                else
+                {
+                    // Normal user booking - authenticate and use authenticated player's ID
+                    var email = _keycloakHelper.GetUserEmail();
+                    if (string.IsNullOrEmpty(email))
+                        throw new Exception("User not authenticated.");
 
-                // Ensure player's email is a university email
-                if (!_keycloakHelper.IsSchoolEmail(email))
-                    throw new Exception("A university email is required.");
+                    // Look up the player by email
+                    player = await _playersRepository.GetPlayerByEmail(email);
+                    if (player == null)
+                    {
+                        // Auto-create minimal Player record for first-time authenticated users
+                        player = await _playersRepository.AddPlayer(new Player
+                        {
+                            Email = email,
+                        });
+                    }
 
-                // Set the booking's playerId to the authenticated player's ID
-                dto.PlayerId = player.Id;
+                    // Ensure player's email is a university email
+                    if (!_keycloakHelper.IsSchoolEmail(email))
+                        throw new Exception("A university email is required.");
+
+                    // Set the booking's playerId to the authenticated player's ID
+                    dto.PlayerId = player.Id;
+                }
 
                 // Validate booking date/time
                 if (dto.BookingDateTime == default)
@@ -71,20 +86,27 @@ namespace gameroombookingsys.Service
                     throw new ArgumentException("Bookings can only be made between 08:00 and 20:00.");
                 }
 
-                // Validate duration: must be > 0 and <= 2 hours.
-                if (dto.Duration <= 0)
-                    throw new ArgumentException("Duration must be greater than zero.");
+                // Validate duration: 0.5h to 2h, in 0.5 increments
+                if (dto.Duration < 0.5)
+                    throw new ArgumentException("Duration must be at least 0.5 hours.");
                 if (dto.Duration > 2)
                     throw new ArgumentException("Duration must be 2 hours or less.");
+                if (Math.Abs(dto.Duration * 2 - Math.Round(dto.Duration * 2)) > 1e-9)
+                    throw new ArgumentException("Duration must be in 0.5 hour increments.");
 
                 if (dto.isPlayingAlone && dto.Fellows > 0)
                     throw new ArgumentException("You cannot play alone and have fellows at the same time.");
                 if (!dto.isPlayingAlone && dto.Fellows == 0)
                     throw new ArgumentException("If you are not playing alone, you must specify the number of fellows.");
 
-                bool isAvailable = await _repository.IsRoomAvailable(dto.BookingDateTime, dto.Duration);
-                if (!isAvailable)
-                    throw new InvalidOperationException("Room is not available at the requested time.");
+                // Enforce exactly one device per booking
+                if (dto.Devices == null || dto.Devices.Count != 1)
+                    throw new ArgumentException("Exactly one device must be selected for a booking.");
+
+                var deviceId = dto.Devices.First().Id;
+                bool isDeviceAvailable = await _repository.IsDeviceAvailable(dto.BookingDateTime, dto.Duration, deviceId);
+                if (!isDeviceAvailable)
+                    throw new InvalidOperationException("Selected device is not available for the requested time.");
 
                 if (dto.BookingDateTime <= DateTime.Now)
                     throw new ArgumentException("Booking date/time must be in the future.");
@@ -93,6 +115,10 @@ namespace gameroombookingsys.Service
                 dto.Status = BookingStatus.Upcoming;
 
                 // Map DTO to entity
+                // PlayerId should always have a value at this point (set above)
+                if (!dto.PlayerId.HasValue)
+                    throw new InvalidOperationException("PlayerId is required for booking creation.");
+
                 var booking = new RoomBooking
                 {
                     BookingDateTime = dto.BookingDateTime,
@@ -100,30 +126,15 @@ namespace gameroombookingsys.Service
                     isPlayingAlone = dto.isPlayingAlone,
                     Fellows = dto.Fellows,
                     Status = dto.Status,
-                    PlayerId = dto.PlayerId,
+                    PlayerId = dto.PlayerId.Value,
                     PassCode = GeneratePassCode(),
                 };
 
-                // Link existing devices by Id (do NOT create new device rows)
-                if (dto.Devices != null && dto.Devices.Count > 0)
-                {
-                    // De-duplicate incoming device selections by Id
-                    var distinctIds = dto.Devices
-                        .Where(d => d != null && d.Id > 0)
-                        .Select(d => d.Id)
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var deviceId in distinctIds)
-                    {
-                        var device = await _deviceRepository.GetDeviceById(deviceId);
-                        if (device == null)
-                        {
-                            throw new KeyNotFoundException($"Device with ID {deviceId} not found.");
-                        }
-                        booking.Devices.Add(device);
-                    }
-                }
+                // Link the selected device
+                var selectedDevice = await _deviceRepository.GetDeviceById(deviceId);
+                if (selectedDevice == null)
+                    throw new KeyNotFoundException($"Device with ID {deviceId} not found.");
+                booking.Devices.Add(selectedDevice);
 
                 // Save
                 var savedBooking = await _repository.AddRoomBooking(booking);
@@ -132,10 +143,18 @@ namespace gameroombookingsys.Service
                 dto.Id = savedBooking.Id;
                 dto.PassCode = savedBooking.PassCode;
 
-                // Send confirmation email with the passcode 
-                var subject = "Game Room Booking Confirmation";
-                var body = $"Your booking has been confirmed. Your game room pass code is: {savedBooking.PassCode}";
-                await _emailService.SendBookingConfirmationEmailAsync(player.Email, subject, body);
+                // Send confirmation email with the passcode (non-blocking for failures)
+                try
+                {
+                    var subject = "Game Room Booking Confirmation";
+                    var body = $"Your booking has been confirmed. Your game room pass code is: {savedBooking.PassCode}";
+                    await _emailService.SendBookingConfirmationEmailAsync(player.Email, subject, body);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Failed to send booking confirmation email to {Email}", player.Email);
+                    // Do not fail the booking on email errors
+                }
 
                 return dto;
             }
@@ -173,6 +192,37 @@ namespace gameroombookingsys.Service
                 }
                 else
                 {
+                    // Validate duration updates: 0.5h to 2h, in 0.5 increments
+                    if (dto.Duration < 0.5)
+                        throw new ArgumentException("Duration must be at least 0.5 hours.");
+                    if (dto.Duration > 2)
+                        throw new ArgumentException("Duration must be 2 hours or less.");
+                    if (Math.Abs(dto.Duration * 2 - Math.Round(dto.Duration * 2)) > 1e-9)
+                        throw new ArgumentException("Duration must be in 0.5 hour increments.");
+
+                    // Enforce exactly one device and check availability for the new window
+                    // Exclude the current booking from availability check since we're updating it
+                    if (dto.Devices == null || dto.Devices.Count != 1)
+                        throw new ArgumentException("Exactly one device must be selected for a booking.");
+                    var deviceId = dto.Devices.First().Id;
+                    
+                    // Check if device changed - if same device, exclude current booking from check
+                    bool sameDevice = booking.Devices.Any(d => d.Id == deviceId);
+                    bool isDeviceAvailable;
+                    if (sameDevice)
+                    {
+                        // Same device: exclude current booking from availability check
+                        isDeviceAvailable = await _repository.IsDeviceAvailableExcludingBooking(dto.BookingDateTime, dto.Duration, deviceId, booking.Id);
+                    }
+                    else
+                    {
+                        // Different device: check normal availability
+                        isDeviceAvailable = await _repository.IsDeviceAvailable(dto.BookingDateTime, dto.Duration, deviceId);
+                    }
+                    
+                    if (!isDeviceAvailable)
+                        throw new InvalidOperationException("Selected device is not available for the requested time.");
+
                     // Update the booking fields
                     booking.BookingDateTime = dto.BookingDateTime;
                     booking.Duration = dto.Duration; 
@@ -180,25 +230,12 @@ namespace gameroombookingsys.Service
                     booking.Fellows = dto.Fellows;
                     booking.Status = dto.Status;
 
-                    // Clear existing or update them individually
+                    // Clear existing and add the selected device
                     booking.Devices.Clear();
-
-                    if (dto.Devices != null && dto.Devices.Count > 0)
-                    {
-                        foreach (var deviceDto in dto.Devices)
-                        {
-                            var device = await _deviceRepository.GetDeviceById(deviceDto.Id);
-                            if (device != null)
-                            {
-                                booking.Devices.Add(device);
-                            }
-                            else
-                            {
-                                // Optionally handle the case where the device isn't found.
-                                throw new KeyNotFoundException($"Device with ID {deviceDto.Id} not found.");
-                            }
-                        }
-                    }
+                    var selectedDevice = await _deviceRepository.GetDeviceById(deviceId);
+                    if (selectedDevice == null)
+                        throw new KeyNotFoundException($"Device with ID {deviceId} not found.");
+                    booking.Devices.Add(selectedDevice);
                 }
 
                 // Save the updated booking through the repository.
@@ -228,8 +265,16 @@ namespace gameroombookingsys.Service
                     body = $"Your booking has been updated. Your game room pass code is: {updatedDto.PassCode}";
                 }
 
-                // Send confirmation email
-                await _emailService.SendBookingConfirmationEmailAsync(player.Email, subject, body);
+                // Send confirmation email (non-blocking for failures)
+                try
+                {
+                    await _emailService.SendBookingConfirmationEmailAsync(player.Email, subject, body);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Failed to send booking update email to {Email}", player.Email);
+                    // Do not fail the update on email errors
+                }
 
                 return updatedDto;
             }
@@ -275,6 +320,33 @@ namespace gameroombookingsys.Service
             {
                 _logger.LogError(ex, $"Error deleting booking with ID {id}.");
                 throw new Exception($"An error occurred while deleting booking with ID {id}: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<bool> DeleteOwnBooking(int id)
+        {
+            try
+            {
+                var booking = await _repository.GetRoomBookingById(id);
+                if (booking == null)
+                    throw new KeyNotFoundException($"Booking with ID {id} was not found.");
+
+                // Verify ownership by authenticated user
+                var email = _keycloakHelper.GetUserEmail();
+                if (string.IsNullOrEmpty(email))
+                    throw new UnauthorizedAccessException("User not authenticated.");
+
+                var player = await _playersRepository.GetPlayerById(booking.PlayerId);
+                if (player == null || !string.Equals(player.Email, email, StringComparison.OrdinalIgnoreCase))
+                    throw new UnauthorizedAccessException("You can only delete your own bookings.");
+
+                await _repository.DeleteRoomBooking(booking);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting own booking with ID {id}.");
+                throw;
             }
         }
 
@@ -409,61 +481,202 @@ namespace gameroombookingsys.Service
          
     public async Task<List<CalendarEventDto>> GetFreeTimeEventsForDay(DateTime day)
     {
-        // Define room operating hours
+        // Operating hours
         DateTime openTime = day.Date.AddHours(8);
         DateTime closeTime = day.Date.AddHours(20);
 
-        // Fetch all bookings (you can also use a method that filters by day if available)
         var allBookings = await _repository.GetAllBookings();
-
-        // Filter bookings for the specific day and that are not cancelled
         var dayBookings = allBookings
-            .Where(b =>
-                b.BookingDateTime.Date == day.Date &&
-                b.Status != BookingStatus.Cancelled)
+            .Where(b => b.Status != BookingStatus.Cancelled &&
+                        b.BookingDateTime.Date == day.Date)
             .OrderBy(b => b.BookingDateTime)
             .ToList();
 
-        var freeIntervals = new List<CalendarEventDto>();
+        // Preload devices and their quantities
+        var deviceBookings = dayBookings
+            .Select(b => new { Booking = b, DeviceIds = b.Devices.Select(d => d.Id).ToList() })
+            .ToList();
 
-        DateTime currentFreeStart = openTime;
-        foreach (var booking in dayBookings)
+        // Build change points
+        var changePoints = new SortedSet<DateTime> { openTime, closeTime };
+        foreach (var b in dayBookings)
         {
-            DateTime bookingStart = booking.BookingDateTime;
-            // If there is a gap between the current free start and the booking start, that is free.
-            if (bookingStart > currentFreeStart)
+            var start = b.BookingDateTime < openTime ? openTime : b.BookingDateTime;
+            var end = b.BookingDateTime.AddHours(b.Duration) > closeTime ? closeTime : b.BookingDateTime.AddHours(b.Duration);
+            if (start < closeTime && end > openTime)
             {
-                freeIntervals.Add(new CalendarEventDto
-                {
-                    Start = currentFreeStart,
-                    End = bookingStart,
-                    Display = "background",
-                    Color = "lightgreen"
-                });
-            }
-            // Update the current free start to the later of what it was and the end of this booking.
-            DateTime bookingEnd = booking.BookingDateTime.AddHours(booking.Duration);
-            if (bookingEnd > currentFreeStart)
-            {
-                currentFreeStart = bookingEnd;
+                changePoints.Add(start);
+                changePoints.Add(end);
             }
         }
 
-        // If there's a free interval between the end of the last booking and closing time, add it.
-        if (currentFreeStart < closeTime)
+        var points = changePoints.Where(p => p >= openTime && p <= closeTime).OrderBy(p => p).ToList();
+        var intervals = new List<CalendarEventDto>();
+        if (points.Count < 2)
         {
-            freeIntervals.Add(new CalendarEventDto
+            return intervals;
+        }
+
+        // Fetch all devices once
+        var devices = await _deviceRepository.GetAllDevices();
+
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            var segStart = points[i];
+            var segEnd = points[i + 1];
+            if (segStart >= segEnd) continue;
+
+            // Bookings overlapping this segment
+            var overlapping = dayBookings.Where(b => b.BookingDateTime < segEnd && b.BookingDateTime.AddHours(b.Duration) > segStart).ToList();
+
+            string color;
+            if (!overlapping.Any())
             {
-                Start = currentFreeStart,
-                End = closeTime,
+                color = "lightgreen"; // green: no bookings
+            }
+            else
+            {
+                // Count per device and compare to quantities
+                bool allDevicesFull = true;
+                foreach (var dv in devices)
+                {
+                    var capacity = dv.Quantity ?? 0;
+                    if (capacity <= 0) continue;
+                    var count = overlapping.Count(b => b.Devices.Any(d => d.Id == dv.Id));
+                    if (count < capacity)
+                    {
+                        allDevicesFull = false;
+                        break;
+                    }
+                }
+
+                color = allDevicesFull ? "#ff9999" : "#ffec99"; // red-ish or yellow-ish
+            }
+
+            intervals.Add(new CalendarEventDto
+            {
+                Start = segStart,
+                End = segEnd,
                 Display = "background",
-                Color = "lightgreen"
+                Color = color
             });
         }
 
-        return freeIntervals;
-    } 
+        return intervals;
+    }
 
+    public async Task<List<CalendarEventDto>> GetFreeTimeEventsForDateRange(DateTime startDate, DateTime endDate)
+    {
+        var allEvents = new List<CalendarEventDto>();
+        
+        // Fetch all bookings once for the entire date range
+        var allBookings = await _repository.GetAllBookings();
+        var rangeBookings = allBookings
+            .Where(b => b.Status != BookingStatus.Cancelled &&
+                        b.BookingDateTime.Date >= startDate.Date &&
+                        b.BookingDateTime.Date <= endDate.Date)
+            .ToList();
+
+        // Fetch all devices once
+        var devices = await _deviceRepository.GetAllDevices();
+
+        // Process each day in the range
+        var currentDate = startDate.Date;
+        while (currentDate <= endDate.Date)
+        {
+            var openTime = currentDate.AddHours(8);
+            var closeTime = currentDate.AddHours(20);
+            
+            var dayBookings = rangeBookings
+                .Where(b => b.BookingDateTime.Date == currentDate)
+                .OrderBy(b => b.BookingDateTime)
+                .ToList();
+
+            // Build change points for this day
+            var changePoints = new SortedSet<DateTime> { openTime, closeTime };
+            foreach (var b in dayBookings)
+            {
+                var start = b.BookingDateTime < openTime ? openTime : b.BookingDateTime;
+                var end = b.BookingDateTime.AddHours(b.Duration) > closeTime ? closeTime : b.BookingDateTime.AddHours(b.Duration);
+                if (start < closeTime && end > openTime)
+                {
+                    changePoints.Add(start);
+                    changePoints.Add(end);
+                }
+            }
+
+            var points = changePoints.Where(p => p >= openTime && p <= closeTime).OrderBy(p => p).ToList();
+            
+            if (points.Count >= 2)
+            {
+                for (int i = 0; i < points.Count - 1; i++)
+                {
+                    var segStart = points[i];
+                    var segEnd = points[i + 1];
+                    if (segStart >= segEnd) continue;
+
+                    // Bookings overlapping this segment
+                    var overlapping = dayBookings.Where(b => b.BookingDateTime < segEnd && b.BookingDateTime.AddHours(b.Duration) > segStart).ToList();
+
+                    string color;
+                    if (!overlapping.Any())
+                    {
+                        color = "lightgreen"; // green: no bookings
+                    }
+                    else
+                    {
+                        // Count per device and compare to quantities
+                        bool allDevicesFull = true;
+                        foreach (var dv in devices)
+                        {
+                            var capacity = dv.Quantity ?? 0;
+                            if (capacity <= 0) continue;
+                            var count = overlapping.Count(b => b.Devices.Any(d => d.Id == dv.Id));
+                            if (count < capacity)
+                            {
+                                allDevicesFull = false;
+                                break;
+                            }
+                        }
+
+                        color = allDevicesFull ? "#ff9999" : "#ffec99"; // red-ish or yellow-ish
+                    }
+
+                    allEvents.Add(new CalendarEventDto
+                    {
+                        Start = segStart,
+                        End = segEnd,
+                        Display = "background",
+                        Color = color
+                    });
+                }
+            }
+            
+            currentDate = currentDate.AddDays(1);
+        }
+
+        return allEvents;
+    }
+
+    public async Task<List<DeviceAvailabilityDto>> GetDeviceAvailabilities(DateTime startTime, double duration)
+    {
+        try
+        {
+            _logger.LogInformation("GetDeviceAvailabilities service: Called with startTime: {StartTime}, duration: {Duration}", startTime, duration);
+            var result = await _repository.GetDeviceAvailabilities(startTime, duration);
+            _logger.LogInformation("GetDeviceAvailabilities service: Repository returned {Count} items", result.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving device availabilities. startTime: {StartTime}, duration: {Duration}. Exception: {Exception}", 
+                startTime, duration, ex.ToString());
+            // Return empty list instead of throwing to prevent 500 errors
+            // Frontend will handle this gracefully by showing all devices as available
+            return new List<DeviceAvailabilityDto>();
+        }
+    }
+ 
     private string GeneratePassCode()
         {
             // Generate a random 6-digit passcode
