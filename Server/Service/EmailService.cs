@@ -2,11 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
+using System.Linq;
 using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using MimeKit;
 using gameroombookingsys.IService;
+using gameroombookingsys.Helpers;
 // Alias to use MailKit's SmtpClient instead of System.Net.Mail.SmtpClient
 using SmtpClient = MailKit.Net.Smtp.SmtpClient;
 
@@ -71,50 +72,114 @@ namespace gameroombookingsys.Helpers
         public async Task SendLoginCodeAsync(string to, string code, string language = "fi")
         {
             // Normalize language code
-            language = language.ToLower();
-            if (language != "en" && language != "fi")
-            {
-                language = "fi"; // Default to Finnish
-            }
+            language = NormalizeLanguage(language);
 
-            // Load localized resources
-            var resources = await LoadEmailResourcesAsync(language);
+            // Load localized resources using ResourceLoader
+            var resources = await ResourceLoader.LoadResourcesAsync(language, "Email");
 
-            // Load HTML template
-            string templatePath = FindFile("Templates", "LoginCodeEmail.html");
-            string htmlContent;
-            
-            if (File.Exists(templatePath))
-            {
-                htmlContent = await File.ReadAllTextAsync(templatePath);
-                
-                // Replace all placeholders
-                htmlContent = htmlContent
-                    .Replace("{{LANG}}", language)
-                    .Replace("{{TITLE}}", resources.GetValueOrDefault("Title", "Login Code"))
-                    .Replace("{{HEADER_TITLE}}", resources.GetValueOrDefault("HeaderTitle", "Game Room Booking"))
-                    .Replace("{{LOGIN_CODE_TITLE}}", resources.GetValueOrDefault("LoginCodeTitle", "Login Code"))
-                    .Replace("{{GREETING}}", resources.GetValueOrDefault("Greeting", "Hello"))
-                    .Replace("{{INFO_TEXT}}", resources.GetValueOrDefault("InfoText", ""))
-                    .Replace("{{CODE}}", code)
-                    .Replace("{{NOTE_LABEL}}", resources.GetValueOrDefault("NoteLabel", "Note"))
-                    .Replace("{{NOTE_TEXT}}", resources.GetValueOrDefault("NoteText", ""))
-                    .Replace("{{IGNORE_TEXT}}", resources.GetValueOrDefault("IgnoreText", ""))
-                    .Replace("{{FOOTER_TEXT}}", resources.GetValueOrDefault("FooterText", ""));
-            }
-            else
-            {
-                // Fallback to simple HTML if template not found
-                htmlContent = language == "en"
-                    ? $"<html><body><h2>Login Code</h2><p>Your login code is: <strong>{code}</strong></p><p>This code is valid for 10 minutes.</p></body></html>"
-                    : $"<html><body><h2>Kirjautumiskoodi</h2><p>Kirjautumiskoodisi on: <strong>{code}</strong></p><p>Tämä koodi on voimassa 10 minuuttia.</p></body></html>";
-            }
+            // Load and process HTML template
+            string htmlContent = await LoadAndProcessTemplateAsync(code, language, resources);
 
+            // Get subject from resources
             string subject = resources.GetValueOrDefault("Subject", 
                 language == "en" 
                     ? "Login Code - Game Room Booking System" 
                     : "Kirjautumiskoodi - Pelihuoneen varausjärjestelmä");
 
+            // Send email
+            await SendEmailAsync(to, subject, htmlContent);
+        }
+
+        /// <summary>
+        /// Normalizes language code to supported values (fi or en).
+        /// </summary>
+        private static string NormalizeLanguage(string language)
+        {
+            if (string.IsNullOrWhiteSpace(language))
+                return "fi";
+
+            language = language.ToLower();
+            return language == "en" ? "en" : "fi";
+        }
+
+        /// <summary>
+        /// Loads HTML template and replaces placeholders with localized values.
+        /// </summary>
+        private async Task<string> LoadAndProcessTemplateAsync(string code, string language, Dictionary<string, string> resources)
+        {
+            // Define placeholder mappings
+            var placeholders = new Dictionary<string, string>
+            {
+                { "{{LANG}}", language },
+                { "{{CODE}}", code },
+                { "{{TITLE}}", resources.GetValueOrDefault("Title", "Login Code") },
+                { "{{HEADER_TITLE}}", resources.GetValueOrDefault("HeaderTitle", "Game Room Booking") },
+                { "{{LOGIN_CODE_TITLE}}", resources.GetValueOrDefault("LoginCodeTitle", "Login Code") },
+                { "{{GREETING}}", resources.GetValueOrDefault("Greeting", "Hello") },
+                { "{{INFO_TEXT}}", resources.GetValueOrDefault("InfoText", "") },
+                { "{{NOTE_LABEL}}", resources.GetValueOrDefault("NoteLabel", "Note") },
+                { "{{NOTE_TEXT}}", resources.GetValueOrDefault("NoteText", "") },
+                { "{{IGNORE_TEXT}}", resources.GetValueOrDefault("IgnoreText", "") },
+                { "{{FOOTER_TEXT}}", resources.GetValueOrDefault("FooterText", "") }
+            };
+
+            // Try to load template file
+            string templatePath = FindTemplateFile("LoginCodeEmail.html");
+            
+            if (File.Exists(templatePath))
+            {
+                string htmlContent = await File.ReadAllTextAsync(templatePath);
+                
+                // Replace all placeholders
+                return placeholders.Aggregate(htmlContent, (current, placeholder) => 
+                    current.Replace(placeholder.Key, placeholder.Value));
+            }
+
+            // Fallback to simple HTML if template not found
+            return GenerateFallbackHtml(code, language);
+        }
+
+        /// <summary>
+        /// Finds template file in multiple possible locations.
+        /// </summary>
+        private static string FindTemplateFile(string fileName)
+        {
+            var searchPaths = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates", fileName),
+                Path.Combine(Directory.GetCurrentDirectory(), "Templates", fileName),
+                Path.Combine("Templates", fileName)
+            };
+
+            return searchPaths.FirstOrDefault(File.Exists) ?? searchPaths.Last();
+        }
+
+        /// <summary>
+        /// Generates fallback HTML when template file is not found.
+        /// </summary>
+        private static string GenerateFallbackHtml(string code, string language)
+        {
+            if (language == "en")
+            {
+                return $@"<html><body>
+                    <h2>Login Code</h2>
+                    <p>Your login code is: <strong>{code}</strong></p>
+                    <p>This code is valid for 10 minutes.</p>
+                </body></html>";
+            }
+
+            return $@"<html><body>
+                <h2>Kirjautumiskoodi</h2>
+                <p>Kirjautumiskoodisi on: <strong>{code}</strong></p>
+                <p>Tämä koodi on voimassa 10 minuuttia.</p>
+            </body></html>";
+        }
+
+        /// <summary>
+        /// Sends an email using SMTP.
+        /// </summary>
+        private async Task SendEmailAsync(string to, string subject, string htmlContent)
+        {
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress("Game Room Booking", _fromAddress));
             message.To.Add(MailboxAddress.Parse(to));
@@ -130,57 +195,5 @@ namespace gameroombookingsys.Helpers
             }
         }
 
-        /// <summary>
-        /// Loads email resources from JSON file for the specified language.
-        /// </summary>
-        private async Task<Dictionary<string, string>> LoadEmailResourcesAsync(string language)
-        {
-            // Use same structure as frontend: locales/{lang}/Email.json
-            string resourceFile = "Email.json";
-            string resourcePath = FindFile(Path.Combine("Resources", "locales", language), resourceFile);
-
-            if (File.Exists(resourcePath))
-            {
-                try
-                {
-                    string jsonContent = await File.ReadAllTextAsync(resourcePath);
-                    var resources = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
-                    return resources ?? new Dictionary<string, string>();
-                }
-                catch (Exception)
-                {
-                    // If parsing fails, return empty dictionary
-                    return new Dictionary<string, string>();
-                }
-            }
-
-            // Fallback: try to load Finnish if requested language not found
-            if (language != "fi")
-            {
-                return await LoadEmailResourcesAsync("fi");
-            }
-
-            return new Dictionary<string, string>();
-        }
-
-        /// <summary>
-        /// Finds a file in the specified directory, trying multiple locations.
-        /// </summary>
-        private string FindFile(string directory, string fileName)
-        {
-            // Try base directory first
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, directory, fileName);
-            if (File.Exists(path))
-                return path;
-
-            // Try current directory
-            path = Path.Combine(Directory.GetCurrentDirectory(), directory, fileName);
-            if (File.Exists(path))
-                return path;
-
-            // Try relative path
-            path = Path.Combine(directory, fileName);
-            return path;
-        }
     }
 }
