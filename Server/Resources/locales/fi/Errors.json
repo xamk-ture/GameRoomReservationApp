@@ -1,0 +1,8 @@
+{
+  "EmailRequired": "Sähköposti on pakollinen.",
+  "EmailAndCodeRequired": "Sähköposti ja koodi ovat pakollisia.",
+  "OnlyXamkEmailsAllowed": "Vain xamk.fi-sähköpostit ovat sallittuja.",
+  "InvalidCode": "Virheellinen koodi.",
+  "CodeExpired": "Koodi on vanhentunut."
+}
+

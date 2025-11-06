@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{LANG}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Code</title>
+    <title>{{TITLE}}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #1a1a1a;">
     <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #1a1a1a;">
@@ -12,17 +12,17 @@
                 <table role="presentation" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #000000; border-radius: 8px; box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3); border: 2px solid #FFD700;">
                     <tr>
                         <td style="padding: 40px 30px; text-align: center; background-color: #FFD700; border-radius: 8px 8px 0 0;">
-                            <h1 style="margin: 0; color: #000000; font-size: 24px; font-weight: bold;">Game Room Booking System</h1>
+                            <h1 style="margin: 0; color: #000000; font-size: 24px; font-weight: bold;">{{HEADER_TITLE}}</h1>
                         </td>
                     </tr>
                     <tr>
                         <td style="padding: 40px 30px; background-color: #000000;">
-                            <h2 style="margin: 0 0 20px 0; color: #FFD700; font-size: 20px; font-weight: bold;">Login Code</h2>
+                            <h2 style="margin: 0 0 20px 0; color: #FFD700; font-size: 20px; font-weight: bold;">{{LOGIN_CODE_TITLE}}</h2>
                             <p style="margin: 0 0 20px 0; color: #ffffff; font-size: 16px; line-height: 1.5;">
-                                Hello,
+                                {{GREETING}},
                             </p>
                             <p style="margin: 0 0 20px 0; color: #ffffff; font-size: 16px; line-height: 1.5;">
-                                You have requested a login code for the game room booking system. Below is your one-time login code:
+                                {{INFO_TEXT}}
                             </p>
                             <div style="background-color: #1a1a1a; border: 3px solid #FFD700; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0; box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);">
                                 <div style="font-size: 42px; font-weight: bold; color: #FFD700; letter-spacing: 10px; font-family: 'Courier New', monospace; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">
@@ -30,17 +30,17 @@
                                 </div>
                             </div>
                             <p style="margin: 20px 0; color: #ffffff; font-size: 14px; line-height: 1.5;">
-                                <strong style="color: #FFD700;">Note:</strong> This code is valid for 10 minutes. Do not share this code with anyone.
+                                <strong style="color: #FFD700;">{{NOTE_LABEL}}:</strong> {{NOTE_TEXT}}
                             </p>
                             <p style="margin: 20px 0 0 0; color: #cccccc; font-size: 14px; line-height: 1.5;">
-                                If you did not request this code, you can ignore this message.
+                                {{IGNORE_TEXT}}
                             </p>
                         </td>
                     </tr>
                     <tr>
                         <td style="padding: 20px 30px; background-color: #1a1a1a; border-radius: 0 0 8px 8px; text-align: center; border-top: 1px solid #333333;">
                             <p style="margin: 0; color: #999999; font-size: 12px;">
-                                This is an automated message. Please do not reply to this email.
+                                {{FOOTER_TEXT}}
                             </p>
                         </td>
                     </tr>

@@ -29,12 +29,13 @@ namespace gameroombookingsys.Service
             _configuration = configuration;
         }
 
-        public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email)
+        public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email, string language = "fi")
         {
             if (!email.EndsWith("@xamk.fi", StringComparison.OrdinalIgnoreCase) &&
                 !email.EndsWith("@edu.xamk.fi", StringComparison.OrdinalIgnoreCase))
             {
-                throw new ArgumentException("Only xamk.fi emails are allowed.");
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "OnlyXamkEmailsAllowed", "Only xamk.fi emails are allowed.");
+                throw new ArgumentException(errorMessage);
             }
 
             var code = Random.Shared.Next(0, 1_000_000).ToString("D6");
@@ -54,10 +55,8 @@ namespace gameroombookingsys.Service
             // Send email with login code
             try
             {
-                // Default to Finnish, but could be determined from user preferences or request headers
-                string language = "fi";
                 await _emailService.SendLoginCodeAsync(email, code, language);
-                _logger.LogInformation("Login code email sent successfully to {Email}", email);
+                _logger.LogInformation("Login code email sent successfully to {Email} in language {Language}", email, language);
             }
             catch (Exception ex)
             {
@@ -68,17 +67,21 @@ namespace gameroombookingsys.Service
             return (email, code, expiresAt);
         }
 
-        public async Task<string> VerifyCodeAndIssueTokenAsync(string email, string code)
+        public async Task<string> VerifyCodeAndIssueTokenAsync(string email, string code, string language = "fi")
         {
             var record = await _codesRepository.GetLatest(email, code);
 
             if (record == null)
-                throw new UnauthorizedAccessException("Invalid code.");
+            {
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "InvalidCode", "Invalid code.");
+                throw new UnauthorizedAccessException(errorMessage);
+            }
 
             if (record.ExpiresAt < DateTime.UtcNow)
             {
                 await _codesRepository.Remove(record);
-                throw new UnauthorizedAccessException("Code expired.");
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "CodeExpired", "Code expired.");
+                throw new UnauthorizedAccessException(errorMessage);
             }
 
             await _codesRepository.Remove(record);

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using gameroombookingsys.IService;
 using gameroombookingsys.DTOs;
+using gameroombookingsys.Helpers;
 
 namespace gameroombookingsys.Controllers
 {
@@ -21,13 +22,26 @@ namespace gameroombookingsys.Controllers
         [HttpPost("request-code")]
         public async Task<IActionResult> RequestCode([FromBody] RequestCodeDto dto)
         {
+            // Get language from Accept-Language header, default to "fi"
+            var language = Request.Headers["Accept-Language"].FirstOrDefault() ?? "fi";
+            // Normalize language code (take first part if format is "en-US" or "fi-FI")
+            if (language.Contains('-'))
+            {
+                language = language.Split('-')[0];
+            }
+            language = language.ToLower();
+
             if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
-                return BadRequest("Email is required.");
+            {
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "EmailRequired", "Email is required.");
+                return BadRequest(errorMessage);
+            }
 
             var email = dto.Email.Trim();
+            
             try
             {
-                var result = await _authService.RequestCodeAsync(email);
+                var result = await _authService.RequestCodeAsync(email, language);
                 return Ok(new { email = result.Email, code = result.Code, expiresAt = result.ExpiresAt });
             }
             catch (ArgumentException ex)
@@ -40,14 +54,26 @@ namespace gameroombookingsys.Controllers
         [HttpPost("verify-code")]
         public async Task<IActionResult> VerifyCode([FromBody] VerifyCodeDto dto)
         {
+            // Get language from Accept-Language header, default to "fi"
+            var language = Request.Headers["Accept-Language"].FirstOrDefault() ?? "fi";
+            // Normalize language code (take first part if format is "en-US" or "fi-FI")
+            if (language.Contains('-'))
+            {
+                language = language.Split('-')[0];
+            }
+            language = language.ToLower();
+
             if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Code))
-                return BadRequest("Email and code are required.");
+            {
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "EmailAndCodeRequired", "Email and code are required.");
+                return BadRequest(errorMessage);
+            }
 
             var email = dto.Email.Trim();
             var code = dto.Code.Trim();
             try
             {
-                var token = await _authService.VerifyCodeAndIssueTokenAsync(email, code);
+                var token = await _authService.VerifyCodeAndIssueTokenAsync(email, code, language);
                 return Ok(new { token });
             }
             catch (UnauthorizedAccessException ex)
