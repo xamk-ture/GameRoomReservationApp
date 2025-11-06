@@ -118,7 +118,6 @@ const Calendar = ({
         }}
         // Optimize navigation responsiveness
         navLinks={true}
-        dayMaxEvents={false}
         moreLinkClick="popover"
         // Prevent event propagation issues
         eventMouseEnter={(info) => {
