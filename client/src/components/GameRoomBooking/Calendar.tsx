@@ -71,7 +71,7 @@ const Calendar = ({
         ref={calendarRef}
         key={i18n.language} // Force re-render when language changes
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
+        initialView={isMobile ? "timeGridDay" : "timeGridWeek"}
         initialDate={new Date()}
         locale={locale}
         headerToolbar={
@@ -87,6 +87,21 @@ const Calendar = ({
                 right: "dayGridMonth,timeGridWeek,timeGridDay",
               }
         }
+        views={{
+          timeGridWeek: {
+            dayHeaderFormat: { weekday: "short", day: "numeric" },
+            slotLabelFormat: { hour: "2-digit", minute: "2-digit" },
+          },
+          timeGridDay: {
+            dayHeaderFormat: { weekday: "long", day: "numeric", month: "short" },
+            slotLabelFormat: { hour: "2-digit", minute: "2-digit" },
+          },
+          dayGridMonth: {
+            dayHeaderFormat: { weekday: "short" },
+          },
+        }}
+        expandRows={true}
+        dayMaxEvents={true}
         events={events}
         height="100%"
         selectable={false}
