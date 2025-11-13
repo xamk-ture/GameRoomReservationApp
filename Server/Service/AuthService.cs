@@ -1,4 +1,8 @@
 using System.Security.Claims;
+using System.Net.Sockets;
+using System.IO;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Gameroombookingsys.Models;
 using gameroombookingsys.Helpers;
 using gameroombookingsys.IService;
@@ -10,28 +14,32 @@ namespace gameroombookingsys.Service
     {
         private readonly IOneTimeLoginCodesRepository _codesRepository;
         private readonly IUsersRepository _usersRepository;
+        private readonly IEmailService _emailService;
         private readonly ILogger<AuthService> _logger;
 
         private readonly IConfiguration _configuration;
 
         public AuthService(
             IOneTimeLoginCodesRepository codesRepository, 
-            IUsersRepository usersRepository, 
+            IUsersRepository usersRepository,
+            IEmailService emailService,
             ILogger<AuthService> logger,
             IConfiguration configuration)
         {
             _codesRepository = codesRepository;
             _usersRepository = usersRepository;
+            _emailService = emailService;
             _logger = logger;
             _configuration = configuration;
         }
 
-        public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email)
+        public async Task<(string Email, string Code, DateTime ExpiresAt)> RequestCodeAsync(string email, string language = "fi")
         {
             if (!email.EndsWith("@xamk.fi", StringComparison.OrdinalIgnoreCase) &&
                 !email.EndsWith("@edu.xamk.fi", StringComparison.OrdinalIgnoreCase))
             {
-                throw new ArgumentException("Only xamk.fi emails are allowed.");
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "OnlyXamkEmailsAllowed", "Only xamk.fi emails are allowed.");
+                throw new ArgumentException(errorMessage);
             }
 
             var code = Random.Shared.Next(0, 1_000_000).ToString("D6");
@@ -48,20 +56,51 @@ namespace gameroombookingsys.Service
                 UpdatedAt = DateTime.UtcNow
             });
 
+            // Send email with login code
+            try
+            {
+                await _emailService.SendLoginCodeAsync(email, code, language);
+                _logger.LogInformation("Login code email sent successfully to {Email} in language {Language}", email, language);
+            }
+            catch (SocketException ex)
+            {
+                _logger.LogError(ex, "Network error while sending login code email to {Email}", email);
+                // Don't throw - code is still generated and stored, user can request it again if needed
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, "IO error while sending login code email to {Email}", email);
+                // Don't throw - code is still generated and stored, user can request it again if needed
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogError(ex, "Configuration error while sending login code email to {Email}", email);
+                // Don't throw - code is still generated and stored, user can request it again if needed
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while sending login code email to {Email}", email);
+                // Don't throw - code is still generated and stored, user can request it again if needed
+            }
+
             return (email, code, expiresAt);
         }
 
-        public async Task<string> VerifyCodeAndIssueTokenAsync(string email, string code)
+        public async Task<string> VerifyCodeAndIssueTokenAsync(string email, string code, string language = "fi")
         {
             var record = await _codesRepository.GetLatest(email, code);
 
             if (record == null)
-                throw new UnauthorizedAccessException("Invalid code.");
+            {
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "InvalidCode", "Invalid code.");
+                throw new UnauthorizedAccessException(errorMessage);
+            }
 
             if (record.ExpiresAt < DateTime.UtcNow)
             {
                 await _codesRepository.Remove(record);
-                throw new UnauthorizedAccessException("Code expired.");
+                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "CodeExpired", "Code expired.");
+                throw new UnauthorizedAccessException(errorMessage);
             }
 
             await _codesRepository.Remove(record);
@@ -71,9 +110,24 @@ namespace gameroombookingsys.Service
             {
                 await _usersRepository.UpsertUser(email);
             }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error while upserting user during login: {Email}", email);
+                // Continue with token generation even if user upsert fails
+            }
+            catch (NpgsqlException ex)
+            {
+                _logger.LogError(ex, "PostgreSQL error while upserting user during login: {Email}", email);
+                // Continue with token generation even if user upsert fails
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "Invalid operation while upserting user during login: {Email}", email);
+                // Continue with token generation even if user upsert fails
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error upserting user during login: {Email}", email);
+                _logger.LogError(ex, "Unexpected error while upserting user during login: {Email}", email);
                 // Continue with token generation even if user upsert fails
             }
 
@@ -92,7 +146,11 @@ namespace gameroombookingsys.Service
                     claims.Add(new Claim(System.Security.Claims.ClaimTypes.Role, "Admin"));
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Log configuration errors but don't fail token generation
+                _logger.LogWarning(ex, "Error checking admin permissions for {Email}, continuing without admin role", email);
+            }
 
             var token = JwtTokenGenerator.CreateJwt(claims, DateTime.UtcNow.AddHours(1));
             return token;

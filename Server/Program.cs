@@ -20,9 +20,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 var pgConnectionString = builder.Configuration.GetConnectionString("PostgresConnection");
 
-// If running inside a container, localhost refers to the container itself. Redirect to host.docker.internal
+// If running inside a container (but NOT in Azure), localhost refers to the container itself. 
+// Redirect to host.docker.internal for local Docker development only.
+// Azure App Service sets WEBSITE_SITE_NAME environment variable, so we can detect Azure environment.
 var runningInContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER");
-if (string.Equals(runningInContainer, "true", StringComparison.OrdinalIgnoreCase))
+var isAzure = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
+if (string.Equals(runningInContainer, "true", StringComparison.OrdinalIgnoreCase) && !isAzure)
 {
     var connectionStringBuilder = new NpgsqlConnectionStringBuilder(pgConnectionString);
     if (connectionStringBuilder.Host == "localhost" || connectionStringBuilder.Host == "127.0.0.1")
