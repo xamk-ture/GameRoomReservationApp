@@ -180,19 +180,7 @@ namespace gameroombookingsys.Helpers
         /// </summary>
         private async Task SendEmailAsync(string to, string subject, string htmlContent)
         {
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress("Game Room Booking", _fromAddress));
-            message.To.Add(MailboxAddress.Parse(to));
-            message.Subject = subject;
-            message.Body = new TextPart("html") { Text = htmlContent };
-
-            using (var client = new SmtpClient())
-            {
-                await client.ConnectAsync(_smtpServer, _smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
-                await client.AuthenticateAsync(_smtpUsername, _smtpPassword);
-                await client.SendAsync(message);
-                await client.DisconnectAsync(true);
-            }
+            await SendEmailAsync(to, subject, htmlContent);
         }
 
     }
