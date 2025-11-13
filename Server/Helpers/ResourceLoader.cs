@@ -16,8 +16,9 @@ namespace gameroombookingsys.Helpers
         /// </summary>
         /// <param name="language">Language code (e.g., "fi", "en")</param>
         /// <param name="resourceName">Resource file name without extension (e.g., "Email", "Errors")</param>
+        /// <param name="attemptedFallback">Internal parameter to prevent infinite recursion</param>
         /// <returns>Dictionary of resource keys and values</returns>
-        public static async Task<Dictionary<string, string>> LoadResourcesAsync(string language, string resourceName)
+        public static async Task<Dictionary<string, string>> LoadResourcesAsync(string language, string resourceName, bool attemptedFallback = false)
         {
             // Normalize language
             language = language.ToLower();
@@ -51,9 +52,10 @@ namespace gameroombookingsys.Helpers
             }
 
             // Fallback: try to load Finnish if requested language not found
-            if (language != "fi")
+            // Prevent infinite recursion by checking if we've already attempted fallback
+            if (language != "fi" && !attemptedFallback)
             {
-                return await LoadResourcesAsync("fi", resourceName);
+                return await LoadResourcesAsync("fi", resourceName, attemptedFallback: true);
             }
 
             return new Dictionary<string, string>();

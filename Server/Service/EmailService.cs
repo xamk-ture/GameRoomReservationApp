@@ -68,26 +68,36 @@ namespace gameroombookingsys.Helpers
 
         /// <summary>
         /// Sends a one-time login code email using HTML template and localized resources.
+        /// TODO: Implement actual email sending in future iteration.
+        /// For now, logs the login code to console for local development.
         /// </summary>
         public async Task SendLoginCodeAsync(string to, string code, string language = "fi")
         {
             // Normalize language code
             language = NormalizeLanguage(language);
 
-            // Load localized resources using ResourceLoader
+            // For local development: print login code to console
+            // TODO: Replace with actual email sending in future iteration
+            Console.WriteLine($"LOGIN CODE FOR: {to}");
+            Console.WriteLine($"CODE: {code}");
+            Console.WriteLine($"Language: {language}");
+            Console.WriteLine($"Valid for: 10 minutes");
+            Console.WriteLine();
+
+            // Load localized resources using ResourceLoader (for future email template use)
             var resources = await ResourceLoader.LoadResourcesAsync(language, "Email");
 
-            // Load and process HTML template
+            // Load and process HTML template (for future email template use)
             string htmlContent = await LoadAndProcessTemplateAsync(code, language, resources);
 
-            // Get subject from resources
+            // Get subject from resources (for future email template use)
             string subject = resources.GetValueOrDefault("Subject", 
                 language == "en" 
                     ? "Login Code - Game Room Booking System" 
                     : "Kirjautumiskoodi - Pelihuoneen varausjärjestelmä");
 
-            // Send email
-            await SendEmailAsync(to, subject, htmlContent);
+            // Email sending is currently disabled for local development
+            // await SendEmailAsync(to, subject, htmlContent);
         }
 
         /// <summary>
@@ -177,10 +187,14 @@ namespace gameroombookingsys.Helpers
 
         /// <summary>
         /// Sends an email using SMTP.
+        /// TODO: Implement actual email sending in future iteration.
+        /// Currently not used - email sending is handled directly in SendLoginCodeAsync for console output.
         /// </summary>
         private async Task SendEmailAsync(string to, string subject, string htmlContent)
         {
-            await SendEmailAsync(to, subject, htmlContent);
+            // TODO: Implement actual SMTP sending logic here in future iteration
+            // For now, this method is not called - email sending is disabled for local development
+            await Task.CompletedTask;
         }
 
     }
