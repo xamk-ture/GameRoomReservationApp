@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using gameroombookingsys.IService;
 using gameroombookingsys.DTOs;
-using gameroombookingsys.Helpers;
 
 namespace gameroombookingsys.Controllers
 {
@@ -18,64 +17,17 @@ namespace gameroombookingsys.Controllers
             _logger = logger;
         }
 
-        /// <summary>
-        /// Extracts and normalizes language code from Accept-Language header.
-        /// Handles formats like "en-US", "fi-FI", "en-US,en;q=0.9", etc.
-        /// Defaults to "fi" if header is missing or invalid.
-        /// </summary>
-        private string GetLanguageFromRequest()
-        {
-            var acceptLanguageHeader = Request.Headers["Accept-Language"].FirstOrDefault();
-            
-            if (string.IsNullOrWhiteSpace(acceptLanguageHeader))
-            {
-                return "fi";
-            }
-
-            // Accept-Language header can contain multiple languages with quality values
-            // Example: "en-US,en;q=0.9,fi;q=0.8"
-            // Take the first language code (before comma)
-            var firstLanguage = acceptLanguageHeader
-                .Split(',')
-                .FirstOrDefault()?
-                .Split(';')
-                .FirstOrDefault()?
-                .Trim();
-
-            if (string.IsNullOrWhiteSpace(firstLanguage))
-            {
-                return "fi";
-            }
-
-            // Normalize language code (take first part if format is "en-US" or "fi-FI")
-            if (firstLanguage.Contains('-'))
-            {
-                firstLanguage = firstLanguage.Split('-')[0];
-            }
-
-            var normalizedLanguage = firstLanguage.ToLower();
-            
-            // Only support "en" and "fi", default to "fi" for anything else
-            return normalizedLanguage == "en" ? "en" : "fi";
-        }
-
         // 1) Request code: accepts xamk.fi email, generates and stores code, returns code in response (for now)
         [HttpPost("request-code")]
         public async Task<IActionResult> RequestCode([FromBody] RequestCodeDto dto)
         {
-            var language = GetLanguageFromRequest();
-
             if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
-            {
-                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "EmailRequired", "Email is required.");
-                return BadRequest(errorMessage);
-            }
+                return BadRequest("Email is required.");
 
             var email = dto.Email.Trim();
-            
             try
             {
-                var result = await _authService.RequestCodeAsync(email, language);
+                var result = await _authService.RequestCodeAsync(email);
                 return Ok(new { email = result.Email, code = result.Code, expiresAt = result.ExpiresAt });
             }
             catch (ArgumentException ex)
@@ -88,19 +40,14 @@ namespace gameroombookingsys.Controllers
         [HttpPost("verify-code")]
         public async Task<IActionResult> VerifyCode([FromBody] VerifyCodeDto dto)
         {
-            var language = GetLanguageFromRequest();
-
             if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Code))
-            {
-                string errorMessage = await ResourceLoader.GetStringAsync(language, "Errors", "EmailAndCodeRequired", "Email and code are required.");
-                return BadRequest(errorMessage);
-            }
+                return BadRequest("Email and code are required.");
 
             var email = dto.Email.Trim();
             var code = dto.Code.Trim();
             try
             {
-                var token = await _authService.VerifyCodeAndIssueTokenAsync(email, code, language);
+                var token = await _authService.VerifyCodeAndIssueTokenAsync(email, code);
                 return Ok(new { token });
             }
             catch (UnauthorizedAccessException ex)

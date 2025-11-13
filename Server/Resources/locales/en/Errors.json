@@ -1,8 +1,0 @@
-{
-  "EmailRequired": "Email is required.",
-  "EmailAndCodeRequired": "Email and code are required.",
-  "OnlyXamkEmailsAllowed": "Only xamk.fi emails are allowed.",
-  "InvalidCode": "Invalid code.",
-  "CodeExpired": "Code expired."
-}
-
