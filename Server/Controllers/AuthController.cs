@@ -18,18 +18,52 @@ namespace gameroombookingsys.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Extracts and normalizes language code from Accept-Language header.
+        /// Handles formats like "en-US", "fi-FI", "en-US,en;q=0.9", etc.
+        /// Defaults to "fi" if header is missing or invalid.
+        /// </summary>
+        private string GetLanguageFromRequest()
+        {
+            var acceptLanguageHeader = Request.Headers["Accept-Language"].FirstOrDefault();
+            
+            if (string.IsNullOrWhiteSpace(acceptLanguageHeader))
+            {
+                return "fi";
+            }
+
+            // Accept-Language header can contain multiple languages with quality values
+            // Example: "en-US,en;q=0.9,fi;q=0.8"
+            // Take the first language code (before comma)
+            var firstLanguage = acceptLanguageHeader
+                .Split(',')
+                .FirstOrDefault()?
+                .Split(';')
+                .FirstOrDefault()?
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(firstLanguage))
+            {
+                return "fi";
+            }
+
+            // Normalize language code (take first part if format is "en-US" or "fi-FI")
+            if (firstLanguage.Contains('-'))
+            {
+                firstLanguage = firstLanguage.Split('-')[0];
+            }
+
+            var normalizedLanguage = firstLanguage.ToLower();
+            
+            // Only support "en" and "fi", default to "fi" for anything else
+            return normalizedLanguage == "en" ? "en" : "fi";
+        }
+
         // 1) Request code: accepts xamk.fi email, generates and stores code, returns code in response (for now)
         [HttpPost("request-code")]
         public async Task<IActionResult> RequestCode([FromBody] RequestCodeDto dto)
         {
-            // Get language from Accept-Language header, default to "fi"
-            var language = Request.Headers["Accept-Language"].FirstOrDefault() ?? "fi";
-            // Normalize language code (take first part if format is "en-US" or "fi-FI")
-            if (language.Contains('-'))
-            {
-                language = language.Split('-')[0];
-            }
-            language = language.ToLower();
+            var language = GetLanguageFromRequest();
 
             if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
             {
@@ -54,14 +88,7 @@ namespace gameroombookingsys.Controllers
         [HttpPost("verify-code")]
         public async Task<IActionResult> VerifyCode([FromBody] VerifyCodeDto dto)
         {
-            // Get language from Accept-Language header, default to "fi"
-            var language = Request.Headers["Accept-Language"].FirstOrDefault() ?? "fi";
-            // Normalize language code (take first part if format is "en-US" or "fi-FI")
-            if (language.Contains('-'))
-            {
-                language = language.Split('-')[0];
-            }
-            language = language.ToLower();
+            var language = GetLanguageFromRequest();
 
             if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Code))
             {

@@ -37,9 +37,15 @@ namespace gameroombookingsys.Helpers
                     var resources = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
                     return resources ?? new Dictionary<string, string>();
                 }
-                catch (Exception)
+                catch (JsonException)
                 {
-                    // If parsing fails, return empty dictionary
+                    // If JSON parsing fails, return empty dictionary
+                    return new Dictionary<string, string>();
+                }
+                catch (Exception ex)
+                {
+                    // Log unexpected exceptions (e.g., IO errors, file permission issues)
+                    Console.Error.WriteLine($"Error loading resource file '{resourcePath}': {ex}");
                     return new Dictionary<string, string>();
                 }
             }
