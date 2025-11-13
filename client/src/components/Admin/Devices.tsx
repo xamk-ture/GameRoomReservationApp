@@ -83,8 +83,8 @@ const AdminDevices = () => {
       <Typography variant="h5" sx={{ mb: 2 }}>{t("admin.devices.manageTitle")}</Typography>
       <Button variant="contained" sx={{ mb: 2, mr: 1 }} onClick={openCreate}>{t("admin.devices.add")}</Button>
       <Button variant="outlined" color="error" sx={{ mb: 2 }} disabled={selected.length === 0} onClick={handleBulkDelete}>{t("common.deleteSelected")}</Button>
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow>
               <TableCell width={24} />

@@ -426,8 +426,12 @@ export default PlayerProfile;
 
 const styles = {
   container: {
-    padding: 2,
-    height: "calc(100vh - 64px)",
+    display: "grid",
+    gridTemplateColumns: { xs: "1fr", md: "75% 20%" },
+    gap: { xs: 3, md: 0 },
+    padding: { xs: 1, md: 2 },
+    height: { xs: "auto", md: "calc(100vh - 64px)" },
+    minHeight: { xs: "calc(100vh - 128px)", md: "calc(100vh - 64px)" },
     overflowY: "auto" as const,
   },
   profileSection: {
@@ -439,7 +443,7 @@ const styles = {
   title: {
     fontWeight: "bold",
     textTransform: "uppercase",
-    fontSize: 32,
+    fontSize: { xs: 24, md: 32 },
     letterSpacing: 1,
     marginBottom: 2,
   },
@@ -447,7 +451,7 @@ const styles = {
     gap: 3,
     display: "flex",
     flexDirection: "column" as const,
-    width: "50%",
+    width: { xs: "100%", md: "50%" },
   },
   bookingsSection: {
     mt: 3,
@@ -462,7 +466,8 @@ const styles = {
     display: "flex",
     flexDirection: "column" as const,
     gap: 2,
-    mt: 2,
+    marginTop: 2,
+    marginBottom: 2,
   },
   bookingCard: {
     borderRadius: 2,

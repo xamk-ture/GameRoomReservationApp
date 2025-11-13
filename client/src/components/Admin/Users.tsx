@@ -44,8 +44,8 @@ const AdminUsers = () => {
       <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
         <Button variant="outlined" color="error" disabled={selectedEmails.length === 0} onClick={() => setConfirmOpen(true)}>{t("common.deleteSelected")}</Button>
       </Box>
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow>
               <TableCell width={24}>
@@ -97,8 +97,8 @@ const AdminUsers = () => {
 
       <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>{t("admin.users.players")}</Typography>
       <TextField size="small" placeholder={t("admin.users.searchByEmail")} value={playerFilter} onChange={(e) => { setPlayerFilter(e.target.value); setPlayerPage(0); }} sx={{ mb: 1 }} />
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow>
               <TableCell>{t("common.id")}</TableCell>

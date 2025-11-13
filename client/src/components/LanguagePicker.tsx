@@ -105,7 +105,7 @@ const LanguagePicker = () => {
         clearOnEscape
         disableClearable
         openOnFocus
-        sx={{ width: 300 }}
+        sx={{ width: { xs: "100%", sm: 300 } }}
       />
     </Stack>
   );

@@ -18,12 +18,12 @@ const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
-    padding: 2,
+    padding: { xs: 1, md: 2 },
   },
   title: {
     fontWeight: "bold",
     textTransform: "uppercase",
-    fontSize: 32,
+    fontSize: { xs: 24, md: 32 },
     letterSpacing: 1,
     marginBottom: 4,
   },

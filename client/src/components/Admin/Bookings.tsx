@@ -367,8 +367,8 @@ const AdminBookings = () => {
         </FormControl>
       </Box>
       {errorMsg && <Typography color="error" sx={{ mb: 1 }}>{errorMsg}</Typography>}
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow>
               <TableCell width={24}>

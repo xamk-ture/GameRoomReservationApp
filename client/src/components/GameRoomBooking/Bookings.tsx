@@ -582,13 +582,14 @@ export default Bookings;
 
 const styles = {
   container: {
-    padding: 2,
-    height: "calc(100vh - 64px)",
+    padding: { xs: 1, md: 2 },
+    height: { xs: "auto", md: "calc(100vh - 64px)" },
+    minHeight: { xs: "calc(100vh - 128px)", md: "calc(100vh - 64px)" },
   },
   title: {
     fontWeight: "bold",
     textTransform: "uppercase",
-    fontSize: 32,
+    fontSize: { xs: 24, md: 32 },
     letterSpacing: 1,
     marginBottom: 4,
   },
