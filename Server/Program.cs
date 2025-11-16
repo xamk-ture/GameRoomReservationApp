@@ -18,7 +18,23 @@ using Npgsql;
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 var builder = WebApplication.CreateBuilder(args);
 
+// Get connection string with better error handling
 var pgConnectionString = builder.Configuration.GetConnectionString("PostgresConnection");
+if (string.IsNullOrWhiteSpace(pgConnectionString))
+{
+    // Try alternative configuration key names that Azure might use
+    pgConnectionString = builder.Configuration["ConnectionStrings:PostgresConnection"] 
+        ?? builder.Configuration["PostgresConnection"]
+        ?? Environment.GetEnvironmentVariable("ConnectionStrings__PostgresConnection")
+        ?? Environment.GetEnvironmentVariable("PostgresConnection");
+    
+    if (string.IsNullOrWhiteSpace(pgConnectionString))
+    {
+        throw new InvalidOperationException(
+            "PostgresConnection connection string is not configured. " +
+            "Please set it in Azure App Service Configuration as 'ConnectionStrings:PostgresConnection' or 'PostgresConnection'.");
+    }
+}
 
 // If running inside a container (but NOT in Azure), localhost refers to the container itself. 
 // Redirect to host.docker.internal for local Docker development only.
@@ -27,13 +43,40 @@ var runningInContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_C
 var isAzure = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
 if (string.Equals(runningInContainer, "true", StringComparison.OrdinalIgnoreCase) && !isAzure)
 {
-    var connectionStringBuilder = new NpgsqlConnectionStringBuilder(pgConnectionString);
-    if (connectionStringBuilder.Host == "localhost" || connectionStringBuilder.Host == "127.0.0.1")
-    {
-        connectionStringBuilder.Host = "host.docker.internal";
-        pgConnectionString = connectionStringBuilder.ConnectionString;
-    }
+ var connectionStringBuilder = new NpgsqlConnectionStringBuilder(pgConnectionString);
+ if (connectionStringBuilder.Host == "localhost" || connectionStringBuilder.Host == "127.0.0.1")
+ {
+ connectionStringBuilder.Host = "host.docker.internal";
+ pgConnectionString = connectionStringBuilder.ConnectionString;
+ }
 }
+
+// Ensure SSL when running on Azure PostgreSQL if not already specified
+try
+{
+ var sslCsb = new NpgsqlConnectionStringBuilder(pgConnectionString);
+ if (isAzure)
+ {
+ // Azure Database for PostgreSQL requires SSL
+ if (sslCsb.SslMode == SslMode.Disable)
+ {
+ sslCsb.SslMode = SslMode.Require;
+ }
+ // In App Service, trusting server certificate is commonly required unless a root cert is provided
+ sslCsb.TrustServerCertificate = true;
+ pgConnectionString = sslCsb.ConnectionString;
+ }
+}
+catch
+{
+ // Ignore parsing issues; connection attempt will surface clearer errors later
+}
+
+// EF migration behavior can be controlled via configuration (e.g., App Service app settings)
+// EF:MigrateOnStartup=true/false (default: true)
+// EF:FailFastOnMigrateError=true/false (default: false in Production to allow app to start even if DB is temporarily unavailable)
+var migrateOnStartup = builder.Configuration.GetValue<bool?>("EF:MigrateOnStartup") ?? true;
+var failFastOnMigrateError = builder.Configuration.GetValue<bool?>("EF:FailFastOnMigrateError") ?? false; // Default to false to allow graceful startup
 
 var allowFrontEndCors = "AllowFrontend";
 var apiTitle = "Game Room Booking API"; 
@@ -56,14 +99,14 @@ var allowedOrigins = new[]
 // Use PostgreSQL only
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(pgConnectionString, npgsqlOptions =>
-    {
-        // Add transient retry to reduce startup races and transient network hiccups
-        npgsqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorCodesToAdd: null);
-    });
+ options.UseNpgsql(pgConnectionString, npgsqlOptions =>
+ {
+ // Add transient retry to reduce startup races and transient network hiccups
+ npgsqlOptions.EnableRetryOnFailure(
+ maxRetryCount:5,
+ maxRetryDelay: TimeSpan.FromSeconds(10),
+ errorCodesToAdd: null);
+ });
 });
 
 // Repository & service registration
@@ -85,56 +128,56 @@ builder.Services.AddScoped<gameroombookingsys.IService.IAuthService, gameroomboo
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 // Enable Controllers & Endpoints
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.WriteIndented = true;
-    });
+ .AddJsonOptions(options =>
+ {
+ options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+ options.JsonSerializerOptions.WriteIndented = true;
+ });
 builder.Services.AddEndpointsApiExplorer();
 
 // OpenAPI Configuration
 builder.Services.AddSwaggerGen(options =>
 {
-    // Enable the annotations
-    options.EnableAnnotations();
+ // Enable the annotations
+ options.EnableAnnotations();
 
-    options.SwaggerDoc(apiVersion, new OpenApiInfo
-    {
-        Title = apiTitle,
-        Version = apiVersion,
-        Description = "API documentation for managing game room bookings.",
-        Contact = new OpenApiContact
-        {
-            Name = "Support Team",
-            Email = "support@gameroombooking.com",
-            Url = new Uri("https://gameroombooking.com/support")
-        }
-    });
+ options.SwaggerDoc(apiVersion, new OpenApiInfo
+ {
+ Title = apiTitle,
+ Version = apiVersion,
+ Description = "API documentation for managing game room bookings.",
+ Contact = new OpenApiContact
+ {
+ Name = "Support Team",
+ Email = "support@gameroombooking.com",
+ Url = new Uri("https://gameroombooking.com/support")
+ }
+ });
 
-    // Add JWT Bearer authentication to Swagger
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
+ // Add JWT Bearer authentication to Swagger
+ options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+ {
+ Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+ Name = "Authorization",
+ In = ParameterLocation.Header,
+ Type = SecuritySchemeType.ApiKey,
+ Scheme = "Bearer"
+ });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
+ options.AddSecurityRequirement(new OpenApiSecurityRequirement
+ {
+ {
+ new OpenApiSecurityScheme
+ {
+ Reference = new OpenApiReference
+ {
+ Type = ReferenceType.SecurityScheme,
+ Id = "Bearer"
+ }
+ },
+ Array.Empty<string>()
+ }
+ });
 });
 
 // Add CORS policy
@@ -177,48 +220,92 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // Authorization with Admin policy
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("Admin", policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireClaim(System.Security.Claims.ClaimTypes.Role, "Admin");
-    });
+ options.AddPolicy("Admin", policy =>
+ {
+ policy.RequireAuthenticatedUser();
+ policy.RequireClaim(System.Security.Claims.ClaimTypes.Role, "Admin");
+ });
 });
 
 var app = builder.Build();
 
 // Ensure database is created and migrations are applied at startup
-using (var scope = app.Services.CreateScope())
+// Use background task to avoid blocking startup if database is temporarily unavailable
+_ = Task.Run(async () =>
 {
- var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
-
- try
+ await Task.Delay(TimeSpan.FromSeconds(2)); // Give app time to start listening
+    
+ using (var scope = app.Services.CreateScope())
  {
- // Log which DB we target (without secrets)
- var csb = new NpgsqlConnectionStringBuilder(pgConnectionString);
- logger.LogInformation("Using PostgreSQL Host={Host} Port={Port} Database={Database} Username={Username}", csb.Host, csb.Port, csb.Database, csb.Username);
+  var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
 
- var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
- var pending = db.Database.GetPendingMigrations().ToList();
- if (pending.Count >0)
- {
- logger.LogInformation("Applying {Count} pending EF migrations: {Migrations}", pending.Count, string.Join(", ", pending));
- }
- else
- {
- logger.LogInformation("No pending EF migrations.");
- }
+  try
+  {
+   // Log which DB we target (without secrets)
+   var csb = new NpgsqlConnectionStringBuilder(pgConnectionString);
+   logger.LogInformation("Using PostgreSQL Host={Host} Port={Port} Database={Database} Username={Username} SslMode={SslMode} TrustServerCertificate={Trust}", csb.Host, csb.Port, csb.Database, csb.Username, csb.SslMode, csb.TrustServerCertificate);
 
- db.Database.Migrate();
+   var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+   
+   // Test database connection before attempting migrations
+   try
+   {
+    var canConnect = await db.Database.CanConnectAsync();
+    if (!canConnect)
+    {
+     logger.LogError("Cannot connect to database. Please check connection string and network access.");
+     if (failFastOnMigrateError)
+     {
+      throw new InvalidOperationException("Database connection failed. Check connection string and ensure database server is accessible.");
+     }
+     logger.LogWarning("Database connection failed, but continuing startup (failFastOnMigrateError=false). App will retry on next request.");
+     return;
+    }
+    logger.LogInformation("Database connection test successful.");
+   }
+   catch (Exception dbEx)
+   {
+    logger.LogError(dbEx, "Database connection test failed");
+    if (failFastOnMigrateError)
+    {
+     throw; // Fail fast on connection issues only if configured
+    }
+    logger.LogWarning("Database connection failed, but continuing startup. App will retry on next request.");
+    return;
+   }
 
- var applied = db.Database.GetAppliedMigrations().ToList();
- logger.LogInformation("Applied migrations count: {Count}", applied.Count);
+   var pending = db.Database.GetPendingMigrations().ToList();
+   if (pending.Count >0)
+   {
+    logger.LogInformation("Applying {Count} pending EF migrations: {Migrations}", pending.Count, string.Join(", ", pending));
+   }
+   else
+   {
+    logger.LogInformation("No pending EF migrations.");
+   }
+
+   if (migrateOnStartup)
+   {
+    db.Database.Migrate();
+    var applied = db.Database.GetAppliedMigrations().ToList();
+    logger.LogInformation("Applied migrations count: {Count}", applied.Count);
+   }
+   else
+   {
+    logger.LogWarning("Skipping EF migrations on startup (EF:MigrateOnStartup=false)");
+   }
+  }
+  catch (Exception ex)
+  {
+   logger.LogError(ex, "Database migration on startup failed");
+   if (failFastOnMigrateError)
+   {
+    throw; // Fail fast when configured to do so
+   }
+   logger.LogWarning("Database migration failed, but app will continue running. Migrations will be retried on next startup.");
+  }
  }
- catch (Exception ex)
- {
- logger.LogError(ex, "Database migration on startup failed");
- throw; // Fail fast so we don't run with a mismatched schema
- }
-}
+});
 
 // Apply Middleware
 app.UseCors(allowFrontEndCors);
@@ -242,5 +329,29 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Lightweight health endpoint for warmup probes
+// Returns 200 if app is running, 503 if database is unavailable
+app.MapGet("/healthz", async () =>
+{
+ try
+ {
+  using (var scope = app.Services.CreateScope())
+  {
+   var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+   var canConnect = await db.Database.CanConnectAsync();
+   if (canConnect)
+   {
+    return Results.Ok(new { status = "OK", database = "connected" });
+   }
+   return Results.StatusCode(503); // Service Unavailable
+  }
+ }
+ catch
+ {
+  // If we can't check database, return 503 but app is still running
+  return Results.StatusCode(503);
+ }
+});
 
 app.Run();
