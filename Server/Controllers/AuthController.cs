@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using gameroombookingsys.IService;
 using gameroombookingsys.DTOs;
 using gameroombookingsys.Helpers;
+using Microsoft.Extensions.Configuration;
+using Azure.Communication.Email;
 
 namespace gameroombookingsys.Controllers
 {
@@ -11,11 +13,13 @@ namespace gameroombookingsys.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IConfiguration configuration)
         {
             _authService = authService;
             _logger = logger;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -115,6 +119,77 @@ namespace gameroombookingsys.Controllers
         {
             var removed = await _authService.CleanupExpiredAsync();
             return Ok(new { removed });
+        }
+
+        // Test endpoint for email sending (temporary - remove after testing)
+        [HttpGet("test-email")]
+        public async Task<IActionResult> TestEmail(string to)
+        {
+            try 
+            {
+                _logger.LogInformation("[TEST] Testing email to {Email}", to);
+                
+                // Get configuration values
+                var connectionString = _configuration.GetConnectionString("CommunicationConnection")
+                    ?? _configuration["ConnectionStrings:CommunicationConnection"]
+                    ?? _configuration["CommunicationConnection"]
+                    ?? Environment.GetEnvironmentVariable("ConnectionStrings__CommunicationConnection")
+                    ?? Environment.GetEnvironmentVariable("CommunicationConnection");
+
+                var sender = _configuration["EmailSettings:SenderAddress"]
+                    ?? _configuration["Email:SenderAddress"]
+                    ?? Environment.GetEnvironmentVariable("EmailSettings__SenderAddress");
+
+                _logger.LogInformation("[TEST] Sender Address: {Sender}", string.IsNullOrEmpty(sender) ? "NULL/EMPTY" : sender);
+                _logger.LogInformation("[TEST] Connection String: {HasConnectionString}", string.IsNullOrEmpty(connectionString) ? "NULL/EMPTY" : "SET (hidden)");
+
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    return BadRequest(new { error = "Connection String puuttuu!", 
+                        message = "Please set 'ConnectionStrings:CommunicationConnection' in Azure App Service Configuration" });
+                }
+
+                if (string.IsNullOrEmpty(sender))
+                {
+                    return BadRequest(new { error = "Sender Address puuttuu!", 
+                        message = "Please set 'EmailSettings:SenderAddress' in Azure App Service Configuration" });
+                }
+
+                // Create client manually for this test
+                var client = new EmailClient(connectionString);
+
+                var emailContent = new EmailContent("Testiviesti Azuresta")
+                {
+                    Html = "<html><body><h1>Toimii!</h1><p>Tämä on testiviesti Azure Communication Servicesista.</p></body></html>"
+                };
+
+                var emailMessage = new EmailMessage(sender, to, emailContent);
+
+                var emailOperation = await client.SendAsync(
+                    Azure.WaitUntil.Completed,
+                    emailMessage);
+
+                _logger.LogInformation("[TEST] Email sent successfully. Operation ID: {OperationId}, Status: {Status}", 
+                    emailOperation.Id, emailOperation.Value.Status);
+
+                return Ok(new { 
+                    success = true, 
+                    message = "Email lähetetty!", 
+                    operationId = emailOperation.Id,
+                    status = emailOperation.Value.Status.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                // This is the error we want to see!
+                _logger.LogError(ex, "[TEST] VIRHE: {Message}\nStackTrace: {StackTrace}", ex.Message, ex.StackTrace);
+                return StatusCode(500, new { 
+                    error = "Email lähetys epäonnistui", 
+                    message = ex.Message, 
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message
+                });
+            }
         }
     }
 }

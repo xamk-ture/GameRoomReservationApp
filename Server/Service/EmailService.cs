@@ -20,7 +20,7 @@ namespace gameroombookingsys.Helpers
         // Azure Communication Services configuration
         private readonly string? _communicationConnectionString;
         private readonly string? _senderAddress;
-        private readonly ILogger<EmailService>? _logger;
+        private readonly ILogger<EmailService> _logger;
 
         // SMTP configuration fields (for backward compatibility with SendBookingConfirmationEmailAsync)
         private readonly string? _smtpServer;
@@ -29,7 +29,7 @@ namespace gameroombookingsys.Helpers
         private readonly string? _smtpPassword;
         private readonly string? _fromAddress;
 
-        public EmailService(IConfiguration configuration, ILogger<EmailService>? logger = null)
+        public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
         {
             _logger = logger;
 
@@ -68,7 +68,12 @@ namespace gameroombookingsys.Helpers
 
             using (var client = new SmtpClient())
             {
-                await client.ConnectAsync(_smtpServer, _smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
+                if (string.IsNullOrWhiteSpace(_smtpServer) || !_smtpPort.HasValue)
+                {
+                    throw new InvalidOperationException("SMTP server and port must be configured to send booking confirmation emails.");
+                }
+
+                await client.ConnectAsync(_smtpServer, _smtpPort.Value, MailKit.Security.SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(_smtpUsername, _smtpPassword);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
@@ -127,13 +132,10 @@ namespace gameroombookingsys.Helpers
             }
 
             // Fallback: For local development or if Azure Communication Services is not configured
-            // Print login code to console
-            Console.WriteLine($"LOGIN CODE FOR: {to}");
-            Console.WriteLine($"CODE: {code}");
-            Console.WriteLine($"Language: {language}");
-            Console.WriteLine($"Valid for: 10 minutes");
-            Console.WriteLine();
-            _logger?.LogWarning("Azure Communication Services not configured. Login code printed to console for {Email}", to);
+            // Log to both console and logger
+            var fallbackMessage = $"LOGIN CODE FOR: {to}\nCODE: {code}\nLanguage: {language}\nValid for: 10 minutes";
+            Console.WriteLine(fallbackMessage);
+            _logger.LogWarning("Azure Communication Services not configured. Login code: {Code} for {Email} (Language: {Language})", code, to, language);
         }
 
         /// <summary>
@@ -259,12 +261,12 @@ namespace gameroombookingsys.Helpers
                     throw new Exception($"Email send failed. Status: {emailOperation.Value.Status}");
                 }
 
-                _logger?.LogInformation("Email sent successfully. Operation ID: {OperationId}, Status: {Status}", 
+                _logger.LogInformation("Email sent successfully. Operation ID: {OperationId}, Status: {Status}", 
                     emailOperation.Id, emailOperation.Value.Status);
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error sending email via Azure Communication Services to {Email}", to);
+                _logger.LogError(ex, "Error sending email via Azure Communication Services to {Email}", to);
                 throw;
             }
         }
