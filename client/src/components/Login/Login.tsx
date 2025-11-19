@@ -57,6 +57,7 @@ const Login: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
+        credentials: 'include', // Required for cookies and authentication
       });
       // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log("[DEV] request-code status:", resp.status);
@@ -107,6 +108,7 @@ const Login: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: code.trim() }),
+        credentials: 'include', // Required for cookies and authentication
       });
       if (!resp.ok) throw new Error();
       const data = await resp.json();
