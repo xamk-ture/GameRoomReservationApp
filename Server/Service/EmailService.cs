@@ -8,6 +8,8 @@ using MailKit.Net.Smtp;
 using MimeKit;
 using gameroombookingsys.IService;
 using gameroombookingsys.Helpers;
+using Azure.Communication.Email;
+using Microsoft.Extensions.Logging;
 // Alias to use MailKit's SmtpClient instead of System.Net.Mail.SmtpClient
 using SmtpClient = MailKit.Net.Smtp.SmtpClient;
 
@@ -15,17 +17,38 @@ namespace gameroombookingsys.Helpers
 {
     public class EmailService : IEmailService
     {
-        // SMTP configuration fields—these will come from appsettings.json.
-        private readonly string _smtpServer;
-        private readonly int _smtpPort;
-        private readonly string _smtpUsername;
-        private readonly string _smtpPassword;
-        private readonly string _fromAddress;
+        // Azure Communication Services configuration
+        private readonly string? _communicationConnectionString;
+        private readonly string? _senderAddress;
+        private readonly ILogger<EmailService>? _logger;
 
-        public EmailService(IConfiguration configuration)
+        // SMTP configuration fields (for backward compatibility with SendBookingConfirmationEmailAsync)
+        private readonly string? _smtpServer;
+        private readonly int? _smtpPort;
+        private readonly string? _smtpUsername;
+        private readonly string? _smtpPassword;
+        private readonly string? _fromAddress;
+
+        public EmailService(IConfiguration configuration, ILogger<EmailService>? logger = null)
         {
+            _logger = logger;
+
+            // Azure Communication Services configuration
+            // Try multiple configuration key formats for flexibility
+            _communicationConnectionString = configuration.GetConnectionString("CommunicationConnection")
+                ?? configuration["ConnectionStrings:CommunicationConnection"]
+                ?? configuration["CommunicationConnection"]
+                ?? Environment.GetEnvironmentVariable("ConnectionStrings__CommunicationConnection")
+                ?? Environment.GetEnvironmentVariable("CommunicationConnection");
+
+            _senderAddress = configuration["EmailSettings:SenderAddress"]
+                ?? configuration["Email:SenderAddress"]
+                ?? Environment.GetEnvironmentVariable("EmailSettings__SenderAddress");
+
+            // SMTP configuration (for backward compatibility)
             _smtpServer = configuration["Smtp:Server"];
-            _smtpPort = int.Parse(configuration["Smtp:Port"]);
+            var smtpPortStr = configuration["Smtp:Port"];
+            _smtpPort = !string.IsNullOrWhiteSpace(smtpPortStr) ? int.Parse(smtpPortStr) : null;
             _smtpUsername = configuration["Smtp:Username"];
             _smtpPassword = configuration["Smtp:Password"];
             _fromAddress = configuration["Smtp:FromAddress"];
@@ -68,36 +91,49 @@ namespace gameroombookingsys.Helpers
 
         /// <summary>
         /// Sends a one-time login code email using HTML template and localized resources.
-        /// TODO: Implement actual email sending in future iteration.
-        /// For now, logs the login code to console for local development.
+        /// Uses Azure Communication Services if configured, otherwise falls back to console logging for local development.
         /// </summary>
         public async Task SendLoginCodeAsync(string to, string code, string language = "fi")
         {
             // Normalize language code
             language = NormalizeLanguage(language);
 
-            // For local development: print login code to console
-            // TODO: Replace with actual email sending in future iteration
-            Console.WriteLine($"LOGIN CODE FOR: {to}");
-            Console.WriteLine($"CODE: {code}");
-            Console.WriteLine($"Language: {language}");
-            Console.WriteLine($"Valid for: 10 minutes");
-            Console.WriteLine();
-
-            // Load localized resources using ResourceLoader (for future email template use)
+            // Load localized resources using ResourceLoader
             var resources = await ResourceLoader.LoadResourcesAsync(language, "Email");
 
-            // Load and process HTML template (for future email template use)
+            // Load and process HTML template
             string htmlContent = await LoadAndProcessTemplateAsync(code, language, resources);
 
-            // Get subject from resources (for future email template use)
+            // Get subject from resources
             string subject = resources.GetValueOrDefault("Subject", 
                 language == "en" 
                     ? "Login Code - Game Room Booking System" 
                     : "Kirjautumiskoodi - Pelihuoneen varausjärjestelmä");
 
-            // Email sending is currently disabled for local development
-            // await SendEmailAsync(to, subject, htmlContent);
+            // Try to send via Azure Communication Services if configured
+            if (!string.IsNullOrWhiteSpace(_communicationConnectionString) && !string.IsNullOrWhiteSpace(_senderAddress))
+            {
+                try
+                {
+                    await SendEmailViaAzureCommunicationServicesAsync(to, subject, htmlContent);
+                    _logger?.LogInformation("Login code email sent successfully via Azure Communication Services to {Email} in language {Language}", to, language);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to send email via Azure Communication Services to {Email}, falling back to console output", to);
+                    // Fall through to console logging
+                }
+            }
+
+            // Fallback: For local development or if Azure Communication Services is not configured
+            // Print login code to console
+            Console.WriteLine($"LOGIN CODE FOR: {to}");
+            Console.WriteLine($"CODE: {code}");
+            Console.WriteLine($"Language: {language}");
+            Console.WriteLine($"Valid for: 10 minutes");
+            Console.WriteLine();
+            _logger?.LogWarning("Azure Communication Services not configured. Login code printed to console for {Email}", to);
         }
 
         /// <summary>
@@ -186,15 +222,51 @@ namespace gameroombookingsys.Helpers
         }
 
         /// <summary>
-        /// Sends an email using SMTP.
-        /// TODO: Implement actual email sending in future iteration.
-        /// Currently not used - email sending is handled directly in SendLoginCodeAsync for console output.
+        /// Sends an email using Azure Communication Services.
         /// </summary>
-        private async Task SendEmailAsync(string to, string subject, string htmlContent)
+        private async Task SendEmailViaAzureCommunicationServicesAsync(string to, string subject, string htmlContent)
         {
-            // TODO: Implement actual SMTP sending logic here in future iteration
-            // For now, this method is not called - email sending is disabled for local development
-            await Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(_communicationConnectionString))
+            {
+                throw new InvalidOperationException("Azure Communication Services connection string is not configured. " +
+                    "Please set it in Azure App Service Configuration as 'ConnectionStrings:CommunicationConnection' or 'CommunicationConnection'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_senderAddress))
+            {
+                throw new InvalidOperationException("Email sender address is not configured. " +
+                    "Please set it in Azure App Service Configuration as 'EmailSettings:SenderAddress'.");
+            }
+
+            var emailClient = new EmailClient(_communicationConnectionString);
+
+            try
+            {
+                var emailContent = new EmailContent(subject)
+                {
+                    Html = htmlContent
+                };
+
+                var emailMessage = new EmailMessage(_senderAddress, to, emailContent);
+
+                var emailOperation = await emailClient.SendAsync(
+                    Azure.WaitUntil.Completed,
+                    emailMessage);
+
+                // Check the status of the email operation
+                if (emailOperation.Value.Status == EmailSendStatus.Failed)
+                {
+                    throw new Exception($"Email send failed. Status: {emailOperation.Value.Status}");
+                }
+
+                _logger?.LogInformation("Email sent successfully. Operation ID: {OperationId}, Status: {Status}", 
+                    emailOperation.Id, emailOperation.Value.Status);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error sending email via Azure Communication Services to {Email}", to);
+                throw;
+            }
         }
 
     }
