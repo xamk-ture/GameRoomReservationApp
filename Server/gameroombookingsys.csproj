@@ -28,7 +28,7 @@
     <PackageReference Include="MimeKit" Version="4.11.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="7.3.1" />
-    <PackageReference Include="Swashbuckle.Core" Version="5.6.0" />
+    <!-- Removed legacy Swashbuckle.Core (targets .NET Framework WebApi) to eliminate incompatible package warnings -->
     <!-- PostgreSQL EF Core provider -->
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.*" />
     <!-- Npgsql ADO.NET provider for NpgsqlConnectionStringBuilder, etc. -->
