@@ -7,6 +7,7 @@ import { usePlayerInfo } from "../../hooks/usePlayerInfo";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthProvider";
+import { useThemeMode } from "../../context/ThemeContext";
 
 interface NavigationProps {
   isAdminMenu?: boolean;
@@ -20,6 +21,7 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
   const location = useLocation();
   const { t } = useTranslation();
   const theme = useTheme();
+  const { mode } = useThemeMode();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [focusedButton, setFocusedButton] = useState(location.pathname);
@@ -31,12 +33,12 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
       : navButtons);
 
   const navContent = (
-    <Box sx={styles.container}>
-      <Box sx={styles.title}>
+    <Box sx={styles(mode).container}>
+      <Box sx={commonStyles.title}>
         <img src={AppTitle} alt="X Game Room" style={{ textAlign: "center", maxWidth: "100%" }} />
       </Box>
-      {error && <Typography sx={styles.error}>{t("errors.loadError")}: {error}</Typography>}
-      <Box sx={styles.navButtons}>
+      {error && <Typography sx={commonStyles.error}>{t("errors.loadError")}: {error}</Typography>}
+      <Box sx={styles(mode).navButtons}>
         {displayButtons.map((button) => (
           <Button
             key={button.translationKey}
@@ -50,20 +52,21 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
             sx={{
               borderBottom: focusedButton === button.path ? 3 : undefined,
               fontWeight: focusedButton === button.path ? "bold" : undefined,
-              borderColor: "black",
+              borderColor: '#000',
+              color: '#000',
             }}
             fullWidth={isMobile}
           >
-            <Link to={button.path} style={{ textDecoration: "none", color: "#000", width: "100%" }}>
+            <Link to={button.path} style={{ textDecoration: "none", color: '#000', width: "100%" }}>
               {t(button.translationKey)}
             </Link>
           </Button>
         ))}
       </Box>
-      <Box sx={styles.userNameAndLogoutButton}>
+      <Box sx={styles(mode).userNameAndLogoutButton}>
         <span />
         <Link to="/">
-          <IconButton sx={styles.logoutButton}>
+          <IconButton sx={styles(mode).logoutButton}>
             <LogoutIcon />
           </IconButton>
         </Link>
@@ -80,7 +83,7 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
         ModalProps={{
           keepMounted: true, // Better open performance on mobile.
         }}
-        sx={styles.drawer}
+        sx={styles(mode).drawer}
       >
         {navContent}
       </Drawer>
@@ -92,28 +95,39 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
 
 export default Navigation;
 
-const styles = {
+const commonStyles = {
+  title: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  error: {
+    color: "red",
+    marginBottom: 2,
+    fontWeight: "bold",
+    fontSize: { xs: "0.875rem", md: "1rem" },
+  },
+};
+
+const styles = (mode: 'light' | 'dark') => ({
   container: {
     width: { xs: 280, md: "20%" },
     padding: { xs: 2, md: 3 },
-    backgroundColor: "#F3A93A",
+    backgroundColor: '#ffaa00',
     height: "100%",
     display: "flex",
     flexDirection: "column" as const,
     position: { xs: "relative", md: "static" } as any,
+    boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
   },
   drawer: {
     display: { xs: "block", md: "none" },
     "& .MuiDrawer-paper": {
       boxSizing: "border-box",
       width: 280,
-      backgroundColor: "#F3A93A",
+      backgroundColor: '#ffaa00',
+      boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
     },
-  },
-  title: {
-    display: "flex",
-    justifyContent: "center",
-    marginBottom: 4,
   },
   navButtons: {
     display: "flex",
@@ -122,14 +136,8 @@ const styles = {
     flexGrow: 1,
     "& a": {
       textDecoration: "none",
-      color: "#000",
+      color: '#000',
     },
-  },
-  error: {
-    color: "red",
-    marginBottom: 2,
-    fontWeight: "bold",
-    fontSize: { xs: "0.875rem", md: "1rem" },
   },
   userNameAndLogoutButton: {
     position: { xs: "relative" as const, md: "absolute" as const },
@@ -143,6 +151,6 @@ const styles = {
     marginTop: { xs: "auto", md: 0 },
   },
   logoutButton: {
-    color: "black",
+    color: '#000',
   },
-};
+});

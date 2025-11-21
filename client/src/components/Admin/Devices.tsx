@@ -10,6 +10,9 @@ const AdminDevices = () => {
   const [editing, setEditing] = useState<DeviceDto | null>(null);
   const [form, setForm] = useState<{ name: string; description?: string; quantity?: number; available: boolean }>({ name: "", description: "", quantity: 1, available: true });
   const [snack, setSnack] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deviceToDelete, setDeviceToDelete] = useState<DeviceDto | null>(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const { t } = useTranslation();
 
   const load = async () => {
@@ -21,19 +24,42 @@ const AdminDevices = () => {
     load();
   }, []);
 
-  const handleDelete = async (id?: number) => {
-    if (!id) return;
-    await api.DevicesService.deleteDevice(id);
-    await load();
+  const handleDelete = (device: DeviceDto) => {
+    setDeviceToDelete(device);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleBulkDelete = async () => {
-    for (const id of selected) {
-      await api.DevicesService.deleteDevice(id);
+  const confirmDelete = async () => {
+    if (!deviceToDelete?.id) return;
+    try {
+      await api.DevicesService.deleteDevice(deviceToDelete.id);
+      setDeleteConfirmOpen(false);
+      setDeviceToDelete(null);
+      await load();
+      setSnack(t("admin.devices.deviceDeleted") || "Device deleted successfully");
+    } catch (error) {
+      console.error("Error deleting device:", error);
+      setSnack(t("errors.deleteFailed") || "Failed to delete device");
     }
-    setSelected([]);
-    await load();
-    setSnack(t("admin.devices.deletedSelected"));
+  };
+
+  const handleBulkDelete = () => {
+    setBulkDeleteConfirmOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      for (const id of selected) {
+        await api.DevicesService.deleteDevice(id);
+      }
+      setSelected([]);
+      setBulkDeleteConfirmOpen(false);
+      await load();
+      setSnack(t("admin.devices.deletedSelected"));
+    } catch (error) {
+      console.error("Error deleting devices:", error);
+      setSnack(t("errors.deleteFailed") || "Failed to delete devices");
+    }
   };
 
   const openCreate = () => {
@@ -86,7 +112,26 @@ const AdminDevices = () => {
 
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-          <Button variant="contained" onClick={openCreate} startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}>
+          <Button
+            variant="contained"
+            onClick={openCreate}
+            startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
             {t("admin.devices.add")}
           </Button>
           <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>
@@ -149,7 +194,7 @@ const AdminDevices = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
-                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d.id!)}>{t("common.delete")}</Button>
+                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d)}>{t("common.delete")}</Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -176,7 +221,76 @@ const AdminDevices = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDialog}>{t("common.cancel")}</Button>
-          <Button variant="contained" onClick={submit}>{editing ? t("common.save") : t("common.create")}</Button>
+          <Button
+            variant="contained"
+            onClick={submit}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {editing ? t("common.save") : t("common.create")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("admin.devices.confirmDeleteBody", { count: selected.length })}
+          </Typography>
+          {selected.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto", border: '1px solid #ccc', p: 1, borderRadius: 1 }}>
+              {devices
+                .filter((device) => selected.includes(device.id!))
+                .map((device) => (
+                  <Typography key={device.id} variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+                    • {device.name} {device.description ? `(${device.description})` : ''}
+                  </Typography>
+                ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmBulkDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeviceToDelete(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {deviceToDelete && t("admin.devices.confirmDelete", { name: deviceToDelete.name })}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setDeviceToDelete(null); }}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+          >
+            {t("common.delete")}
+          </Button>
         </DialogActions>
       </Dialog>
 

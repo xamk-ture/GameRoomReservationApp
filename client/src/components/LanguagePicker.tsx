@@ -68,10 +68,18 @@ const LanguagePicker = () => {
           onClick={handleClick}
           size="small"
           sx={{
-            color: "inherit",
+            backgroundColor: "#ffaa00",
+            color: "#000",
+            boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
             "&:hover": {
-              backgroundColor: "action.hover",
+              backgroundColor: "#e69900",
+              boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+              transform: "translateY(-1px)",
             },
+            "&:active": {
+              transform: "translateY(0)",
+            },
+            transition: "all 0.3s ease",
           }}
           aria-label={t("Language")}
           aria-controls={open ? "language-menu" : undefined}

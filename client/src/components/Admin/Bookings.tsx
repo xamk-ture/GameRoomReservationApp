@@ -29,6 +29,9 @@ const AdminBookings = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [playerFilter, setPlayerFilter] = useState<string>("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [bookingToDelete, setBookingToDelete] = useState<RoomBookingDto | null>(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const { t, i18n } = useTranslation();
 
   const load = async () => {
@@ -141,17 +144,42 @@ const AdminBookings = () => {
     return availability ? availability.availableQuantity === 0 : false;
   };
 
-  const handleDelete = async (id?: number) => {
-    if (!id) return;
-    await api.RoomBookingsService.deleteBooking(id);
-    await load();
+  const handleDelete = (booking: RoomBookingDto) => {
+    setBookingToDelete(booking);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleBulkDelete = async () => {
-    for (const id of selected) await api.RoomBookingsService.deleteBooking(id);
-    setSelected([]);
-    await load();
-    setSnack(t("admin.bookings.deletedSelected"));
+  const confirmDelete = async () => {
+    if (!bookingToDelete?.id) return;
+    try {
+      await api.RoomBookingsService.deleteBooking(bookingToDelete.id);
+      setDeleteConfirmOpen(false);
+      setBookingToDelete(null);
+      await load();
+      setSnack(t("admin.bookings.bookingDeleted") || "Booking deleted successfully");
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      setErrorMsg(t("errors.bookingDeleteFailed") || "Failed to delete booking");
+    }
+  };
+
+  const handleBulkDelete = () => {
+    setBulkDeleteConfirmOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      for (const id of selected) {
+        await api.RoomBookingsService.deleteBooking(id);
+      }
+      setSelected([]);
+      setBulkDeleteConfirmOpen(false);
+      await load();
+      setSnack(t("admin.bookings.deletedSelected"));
+    } catch (error) {
+      console.error("Error deleting bookings:", error);
+      setErrorMsg(t("errors.bookingDeleteFailed") || "Failed to delete bookings");
+    }
   };
 
   const openCreate = () => {
@@ -345,7 +373,26 @@ const AdminBookings = () => {
 
       <Paper elevation={2} sx={{ p: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
-          <Button variant="contained" onClick={openCreate} startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}>
+          <Button
+            variant="contained"
+            onClick={openCreate}
+            startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
             {t("admin.bookings.add")}
           </Button>
           <Button variant="outlined" onClick={load}>
@@ -385,15 +432,12 @@ const AdminBookings = () => {
             <TableHead sx={{ bgcolor: "action.hover" }}>
               <TableRow>
                 <TableCell width={40}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
+                    indeterminate={selected.length > 0 && selected.length < filteredBookings.length}
                     onChange={handleSelectAll}
-                    title={selected.length === filteredBookings.length && filteredBookings.length > 0 ? t("admin.bookings.deselectAll") : t("admin.bookings.selectAll")}
-                    style={{ width: 18, height: 18, cursor: "pointer" }}
                   />
                 </TableCell>
-                <TableCell><strong>{t("common.id")}</strong></TableCell>
                 <TableCell><strong>{t("admin.bookings.player")}</strong></TableCell>
                 <TableCell><strong>{t("admin.bookings.start")}</strong></TableCell>
                 <TableCell><strong>{t("admin.bookings.end")}</strong></TableCell>
@@ -409,18 +453,15 @@ const AdminBookings = () => {
                 return (
                   <TableRow key={booking.id} hover sx={{ opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
                     <TableCell>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selected.includes(booking.id!)}
                         onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))}
-                        style={{ width: 18, height: 18, cursor: "pointer" }}
                       />
                     </TableCell>
                     <TableCell>
-                      {booking.id}
+                      {formatEmailPrefix((booking as any).playerEmail)}
                       {isCancelled && <Box component="span" sx={{ ml: 1, px: 0.5, py: 0, bgcolor: "error.light", color: "error.contrastText", borderRadius: 0.5, fontSize: "0.7rem" }}>CANCELLED</Box>}
                     </TableCell>
-                    <TableCell>{formatEmailPrefix((booking as any).playerEmail)}</TableCell>
                     <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
                     <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
                     <TableCell>
@@ -428,7 +469,7 @@ const AdminBookings = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(booking)}>{t("common.edit")}</Button>
-                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(booking.id!)}>{t("common.delete")}</Button>
+                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(booking)}>{t("common.delete")}</Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -536,7 +577,151 @@ const AdminBookings = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDialog}>{t("common.cancel")}</Button>
-          <Button variant="contained" onClick={submit}>{editing ? t("common.save") : t("common.create")}</Button>
+          <Button
+            variant="contained"
+            onClick={submit}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {editing ? t("common.save") : t("common.create")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("admin.bookings.confirmDeleteBody", { count: selected.length })}
+          </Typography>
+          {selected.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto", border: '1px solid #ccc', p: 1, borderRadius: 1 }}>
+              {filteredBookings
+                .filter((booking: RoomBookingDto) => selected.includes(booking.id!))
+                .map((booking: RoomBookingDto) => (
+                  <Typography key={booking.id} variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+                    • {formatEmailPrefix((booking as any).playerEmail)} - {formatDateTime(booking.bookingDateTime)}
+                  </Typography>
+                ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmBulkDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("bookings.confirmDelete")}
+          </Typography>
+          {bookingToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.player")}:</strong> {formatEmailPrefix((bookingToDelete as any).playerEmail)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.start")}:</strong> {formatDateTime(bookingToDelete.bookingDateTime)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{t("admin.bookings.devices")}:</strong> {(bookingToDelete.devices || []).map(d => d.name).join(", ") || "-"}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("admin.bookings.confirmDeleteBody", { count: selected.length })}
+          </Typography>
+          {selected.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto", border: '1px solid #ccc', p: 1, borderRadius: 1 }}>
+              {filteredBookings
+                .filter((booking: RoomBookingDto) => selected.includes(booking.id!))
+                .map((booking: RoomBookingDto) => (
+                  <Typography key={booking.id} variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+                    • {formatEmailPrefix((booking as any).playerEmail)} - {formatDateTime(booking.bookingDateTime)}
+                  </Typography>
+                ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmBulkDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("bookings.confirmDelete")}
+          </Typography>
+          {bookingToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.player")}:</strong> {formatEmailPrefix((bookingToDelete as any).playerEmail)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.start")}:</strong> {formatDateTime(bookingToDelete.bookingDateTime)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{t("admin.bookings.devices")}:</strong> {(bookingToDelete.devices || []).map(d => d.name).join(", ") || "-"}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+          >
+            {t("common.delete")}
+          </Button>
         </DialogActions>
       </Dialog>
 

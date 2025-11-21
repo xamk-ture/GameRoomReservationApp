@@ -105,6 +105,21 @@ const AdminUsers = () => {
             variant="contained"
             onClick={() => setCreateOpen(true)}
             startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
           >
             {t("admin.users.addUser")}
           </Button>
@@ -273,6 +288,26 @@ const AdminUsers = () => {
               }
             }}
             disabled={!newUserEmail.trim()}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              "&:disabled": {
+                backgroundColor: "#ccc",
+                color: "#666",
+                boxShadow: "none",
+              },
+              transition: "all 0.3s ease",
+            }}
           >
             {t("common.create")}
           </Button>

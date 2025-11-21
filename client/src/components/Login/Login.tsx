@@ -10,7 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { OpenAPI } from "../../api/core/OpenAPI";
 import { PlayerDto } from "../../api/api";
-import gameRoomImage from "../../assets/gameroomimage.svg";
+import loginBackground from "../../assets/login-background.jpg";
 import { enqueueSnackbar } from "notistack";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthProvider";
@@ -19,7 +19,7 @@ import LanguagePicker from "../LanguagePicker";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { setToken } = useAuth();
 
   // Do NOT auto-redirect on load; always show login. Redirect only after verify.
@@ -191,10 +191,25 @@ const Login: React.FC = () => {
           {!codeSent ? (
             <Button
               variant="contained"
-              color="primary"
               onClick={handleSendCode}
               disabled={isSending}
-              sx={{ mt: 2, width: "100%" }}
+              sx={{
+                mt: 2,
+                width: "100%",
+                backgroundColor: "#ffaa00",
+                color: "#000",
+                fontWeight: 600,
+                boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+                "&:hover": {
+                  backgroundColor: "#e69900",
+                  boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                  transform: "translateY(-1px)",
+                },
+                "&:active": {
+                  transform: "translateY(0)",
+                },
+                transition: "all 0.3s ease",
+              }}
             >
               {isSending ? t("login.sending") : t("login.sendCode")}
             </Button>
@@ -202,16 +217,36 @@ const Login: React.FC = () => {
             <>
               <Button
                 variant="contained"
-                color="primary"
                 onClick={handleVerifyCode}
                 disabled={isVerifying || code.trim().length === 0}
-                sx={{ mt: 2, width: "100%" }}
+                sx={{
+                  mt: 2,
+                  width: "100%",
+                  backgroundColor: "#FFC107",
+                  color: "#000",
+                  fontWeight: 600,
+                  boxShadow: "0 4px 15px rgba(255, 193, 7, 0.4), 0 0 20px rgba(255, 193, 7, 0.2)",
+                  "&:hover": {
+                    backgroundColor: "#FFB300",
+                    boxShadow: "0 6px 20px rgba(255, 193, 7, 0.5), 0 0 25px rgba(255, 193, 7, 0.3)",
+                    transform: "translateY(-1px)",
+                  },
+                  "&:active": {
+                    transform: "translateY(0)",
+                  },
+                  "&:disabled": {
+                    backgroundColor: "#ccc",
+                    color: "#666",
+                    boxShadow: "none",
+                  },
+                  transition: "all 0.3s ease",
+                }}
               >
                 {isVerifying ? t("login.verifying") : t("login.verify")}
               </Button>
               <Button
                 variant="outlined"
-                color="secondary"
+                color="error"
                 onClick={() => {
                   setCode("");
                   setCodeSent(false);
@@ -235,7 +270,7 @@ export default Login;
 
 const styles = {
   background: {
-    backgroundImage: `url(${gameRoomImage})`,
+    backgroundImage: `url(${loginBackground})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",

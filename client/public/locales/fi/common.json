@@ -59,6 +59,9 @@
   "admin.devices.statusAvailable": "Saatavilla",
   "admin.devices.statusUnavailable": "Ei saatavilla",
   "admin.devices.noDevices": "Laitteita ei löytynyt",
+  "admin.devices.confirmDelete": "Haluatko poistaa {{name}}?",
+  "admin.devices.confirmDeleteBody": "Haluatko poistaa {{count}} laitetta? Tätä ei voi perua.",
+  "admin.devices.deviceDeleted": "Laite poistettu onnistuneesti",
   
   "admin.bookings.manageTitle": "Hallinnoi varauksia",
   "admin.bookings.add": "Lisää varaus",
@@ -87,6 +90,7 @@
   "admin.bookings.selectAll": "Valitse kaikki",
   "admin.bookings.deselectAll": "Poista valinta kaikista",
   "admin.bookings.noBookings": "Varauksia ei löytynyt",
+  "admin.bookings.confirmDeleteBody": "Haluatko varmasti poistaa pysyvästi {{count}} varauksen? Tätä ei voi perua.",
   
   "admin.dashboard.title": "Hallintapaneeli",
   "admin.dashboard.totalUsers": "Käyttäjiä yhteensä",
@@ -163,5 +167,8 @@
   
   "registration.title": "Rekisteröidy",
   "registration.emailPrompt": "Syötä yliopiston sähköpostiosoite saadaksesi rekisteröintilinkin",
-  "registration.send": "Lähetä"
+  "registration.send": "Lähetä",
+  "settings.theme": "Teema",
+  "settings.light": "Vaalea",
+  "settings.dark": "Tumma"
 }

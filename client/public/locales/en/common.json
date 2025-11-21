@@ -55,6 +55,9 @@
   "admin.devices.statusAvailable": "Available",
   "admin.devices.statusUnavailable": "Unavailable",
   "admin.devices.noDevices": "No devices found",
+  "admin.devices.confirmDelete": "Are you sure you want to delete {{name}}?",
+  "admin.devices.confirmDeleteBody": "Are you sure you want to delete {{count}} device(s)? This cannot be undone.",
+  "admin.devices.deviceDeleted": "Device deleted successfully",
   "admin.bookings.manageTitle": "Manage bookings",
   "admin.bookings.add": "Add booking",
   "admin.bookings.edit": "Edit booking",
@@ -82,6 +85,7 @@
   "admin.bookings.selectAll": "Select all",
   "admin.bookings.deselectAll": "Deselect all",
   "admin.bookings.noBookings": "No bookings found",
+  "admin.bookings.confirmDeleteBody": "Are you sure you want to permanently delete {{count}} booking(s)? This cannot be undone.",
   "admin.dashboard.title": "Dashboard",
   "admin.dashboard.totalUsers": "Total Users",
   "admin.dashboard.totalDevices": "Devices",
@@ -150,5 +154,8 @@
   "profile.noDevice": "No device",
   "registration.title": "Register in",
   "registration.emailPrompt": "Enter your university email to receive a registration link",
-  "registration.send": "Send"
+  "registration.send": "Send",
+  "settings.theme": "Theme",
+  "settings.light": "Light",
+  "settings.dark": "Dark"
 }
