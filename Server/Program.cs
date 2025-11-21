@@ -81,20 +81,24 @@ var failFastOnMigrateError = builder.Configuration.GetValue<bool?>("EF:FailFastO
 var allowFrontEndCors = "AllowFrontend";
 var apiTitle = "Game Room Booking API"; 
 var apiVersion = "v1"; 
-// Allow common dev origins
-var allowedOrigins = new[]
-{
- "http://localhost:5173",
- "http://localhost:5174",
- "https://localhost:5173",
- "https://localhost:5174",
- "http://127.0.0.1:5173",
- "http://127.0.0.1:5174",
- "https://127.0.0.1:5173",
- "https://127.0.0.1:5174",
- "http://localhost:8080",
- "https://localhost:8080"
-};
+
+// Get allowed origins from configuration or use defaults
+var corsOriginsConfig = builder.Configuration["CORS:AllowedOrigins"];
+var allowedOrigins = !string.IsNullOrWhiteSpace(corsOriginsConfig)
+ ? corsOriginsConfig.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+ : new[]
+ {
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://localhost:5173",
+  "https://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "https://127.0.0.1:5173",
+  "https://127.0.0.1:5174",
+  "http://localhost:8080",
+  "https://localhost:8080"
+ };
 
 // Use PostgreSQL only
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -187,7 +191,8 @@ builder.Services.AddCors(options =>
  {
  policy.WithOrigins(allowedOrigins)
  .AllowAnyMethod()
- .AllowAnyHeader();
+ .AllowAnyHeader()
+ .AllowCredentials(); // Required for cookies and authentication headers
  });
 });
 

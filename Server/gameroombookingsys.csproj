@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
     <PackageReference Include="MailKit" Version="4.11.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.8" />
@@ -28,7 +29,7 @@
     <PackageReference Include="MimeKit" Version="4.11.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="7.3.1" />
-    <PackageReference Include="Swashbuckle.Core" Version="5.6.0" />
+    <!-- Removed legacy Swashbuckle.Core (targets .NET Framework WebApi) to eliminate incompatible package warnings -->
     <!-- PostgreSQL EF Core provider -->
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.*" />
     <!-- Npgsql ADO.NET provider for NpgsqlConnectionStringBuilder, etc. -->

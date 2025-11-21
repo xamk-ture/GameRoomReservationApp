@@ -3,14 +3,13 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { OpenAPI } from "./api/core/OpenAPI.ts";
 import "./App.css";
-import { appTheme } from "./Themes/themes.ts";
-import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { SnackbarProvider } from "notistack";
 import { LoaderProvider } from "./context/LoaderProvider.tsx";
 import I18nProvider from "./i18n/context/I18nProvider.tsx";
 import { PlayerInfoProvider } from "./context/PlayerInfoProvider.tsx";
 import { AuthProvider } from "./context/AuthProvider";
+import { ThemeContextProvider } from "./context/ThemeContext.tsx";
 
 function initApiHeadersFromStorage() {
   const token = localStorage.getItem("jwtToken");
@@ -34,16 +33,16 @@ createRoot(document.getElementById("root")!).render(
   <AuthProvider>
     <PlayerInfoProvider>
       <I18nProvider>
-        <LoaderProvider>
-          <SnackbarProvider maxSnack={3} autoHideDuration={4000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-            <ThemeProvider theme={appTheme}>
+        <ThemeContextProvider>
+          <LoaderProvider>
+            <SnackbarProvider maxSnack={3} autoHideDuration={4000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
               <CssBaseline />
               <StrictMode>
                 <App />
               </StrictMode>
-            </ThemeProvider>
-          </SnackbarProvider>
-        </LoaderProvider>
+            </SnackbarProvider>
+          </LoaderProvider>
+        </ThemeContextProvider>
       </I18nProvider>
     </PlayerInfoProvider>
   </AuthProvider>

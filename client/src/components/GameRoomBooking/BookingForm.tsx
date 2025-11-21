@@ -39,17 +39,21 @@ export enum ModalMode {
   UPDATE = "UPDATE",
 }
 
+import { PlayerDto } from "../../api";
+
 export interface BookingFormProps {
   mode: ModalMode;
   booking: RoomBookingDto;
   allDevices: DeviceDto[];
   selectedBooking: RoomBookingDto | null;
   allBookings?: RoomBookingDto[]; // Optional: all bookings for availability calculation
+  players?: PlayerDto[]; // Optional: list of players for admin selection
   onBookingDateTimeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDurationChange: (e: { target: { value: number } }) => void;
   onPlayingAloneChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFellowsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDeviceChange: (deviceId: number, checked: boolean) => void;
+  onPlayerChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; // Optional: handler for player selection
   onSubmit: () => void;
   onCancel: () => void;
   checkFieldsValidation: () => boolean;
@@ -67,11 +71,13 @@ const BookingForm = (props: BookingFormProps) => {
     allDevices,
     selectedBooking,
     allBookings: propsAllBookings,
+    players,
     onBookingDateTimeChange,
     onDurationChange,
     onPlayingAloneChange,
     onFellowsChange,
     onDeviceChange,
+    onPlayerChange,
     onSubmit,
     onCancel,
     checkFieldsValidation,
@@ -105,7 +111,7 @@ const BookingForm = (props: BookingFormProps) => {
         const base = (OpenAPI as any).BASE || "";
         const headers = { ...(OpenAPI as any).HEADERS } as Record<string, string>;
         const response = await fetch(`${base}/api/gameroombookings/bookings-for-availability`, { headers });
-        
+
         if (response.ok) {
           const bookings = await response.json();
           setFetchedAllBookings(Array.isArray(bookings) ? bookings : []);
@@ -129,7 +135,7 @@ const BookingForm = (props: BookingFormProps) => {
   // Calculate device availability based on bookings
   const availabilityMap = useMemo(() => {
     const map = new Map<number, DeviceAvailability>();
-    
+
     if (!booking.bookingDateTime || !booking.duration) {
       return map;
     }
@@ -157,21 +163,21 @@ const BookingForm = (props: BookingFormProps) => {
       if (!device.id) return;
 
       const totalQuantity = device.quantity ?? 0;
-      
+
       // Count how many of this device are booked during the requested time
       let bookedCount = 0;
       activeBookings.forEach(bookingItem => {
         if (!bookingItem.bookingDateTime) return;
-        
+
         // Normalize booking time - server returns ISO strings which may include timezone
         // If it's a string without timezone, treat it as local time
         const bookingStart = dayjs(bookingItem.bookingDateTime);
         const bookingEnd = bookingStart.add(bookingItem.duration ?? 0, 'hour');
-        
+
         // Check if booking overlaps with requested time
         // Overlap: bookingStart < endTime AND bookingEnd > startTime
         const overlaps = bookingStart.isBefore(endTime) && bookingEnd.isAfter(startTime);
-        
+
         if (overlaps && bookingItem.devices) {
           // Check if this booking uses the device
           const usesDevice = bookingItem.devices.some(deviceInBooking => deviceInBooking.id === device.id);
@@ -202,7 +208,7 @@ const BookingForm = (props: BookingFormProps) => {
 
         // Find the earliest end time (when device becomes available)
         if (overlappingBookings.length > 0) {
-          const earliestEnd = overlappingBookings.reduce((earliest, current) => 
+          const earliestEnd = overlappingBookings.reduce((earliest, current) =>
             current.isBefore(earliest) ? current : earliest
           );
           nextAvailableTime = earliestEnd.toISOString();
@@ -234,6 +240,23 @@ const BookingForm = (props: BookingFormProps) => {
   return (
     <>
       <DialogContent>
+        {players && players.length > 0 && (
+          <FormControl fullWidth margin="dense">
+            <InputLabel>{t("admin.bookings.player")}</InputLabel>
+            <Select
+              value={booking.playerId || ""}
+              label={t("admin.bookings.player")}
+              onChange={(e) => onPlayerChange && onPlayerChange({ target: { value: e.target.value } } as any)}
+              disabled={isDisabled}
+            >
+              {players.map((player) => (
+                <MenuItem key={player.id} value={player.id}>
+                  {player.email ? player.email.split("@")[0] : `Player ${player.id}`}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
         <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dayjsLocale}>
           <DateTimePicker
             label={t("admin.bookings.start")}
@@ -320,18 +343,18 @@ const BookingForm = (props: BookingFormProps) => {
               // Show availability if we have valid datetime and duration
               const hasValidDateTime = booking.bookingDateTime && booking.duration;
               const showAvailability = hasValidDateTime && availability !== undefined;
-              
+
               return (
                 <MenuItem key={device.id} value={device.id} title={device.description || ""} disabled={fullyBooked}>
                   <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>{device.name || `#${device.id}`}</span>
                       {showAvailability && (
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
+                        <Typography
+                          variant="caption"
+                          sx={{
                             ml: 1,
-                            color: availability 
+                            color: availability
                               ? (fullyBooked ? "error.main" : availability.availableQuantity > 0 ? "success.main" : "warning.main")
                               : "text.secondary",
                             fontWeight: "medium"
@@ -339,10 +362,10 @@ const BookingForm = (props: BookingFormProps) => {
                         >
                           {availability
                             ? (fullyBooked && availability.nextAvailableTime
-                              ? t("bookings.deviceNextAvailable", { 
-                                  time: dayjs(availability.nextAvailableTime).format(i18n.language === "en" ? "h:mm A" : "HH.mm"),
-                                  date: dayjs(availability.nextAvailableTime).format("DD.MM.YYYY")
-                                })
+                              ? t("bookings.deviceNextAvailable", {
+                                time: dayjs(availability.nextAvailableTime).format(i18n.language === "en" ? "h:mm A" : "HH.mm"),
+                                date: dayjs(availability.nextAvailableTime).format("DD.MM.YYYY")
+                              })
                               : t("bookings.deviceAvailable", { available: availability.availableQuantity, total: availability.totalQuantity }))
                             : `${device.quantity ?? 0}/${device.quantity ?? 0}`}
                         </Typography>
@@ -378,6 +401,26 @@ const BookingForm = (props: BookingFormProps) => {
                     variant="contained"
                     onClick={onUpdateBooking}
                     disabled={mode === ModalMode.UPDATE && !onFieldChange()}
+                    sx={{
+                      backgroundColor: "#ffaa00",
+                      color: "#000",
+                      fontWeight: 600,
+                      boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+                      "&:hover": {
+                        backgroundColor: "#e69900",
+                        boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                        transform: "translateY(-1px)",
+                      },
+                      "&:active": {
+                        transform: "translateY(0)",
+                      },
+                      "&:disabled": {
+                        backgroundColor: "#ccc",
+                        color: "#666",
+                        boxShadow: "none",
+                      },
+                      transition: "all 0.3s ease",
+                    }}
                   >
                     {t("common.save")}
                   </Button>
@@ -392,6 +435,26 @@ const BookingForm = (props: BookingFormProps) => {
               variant="contained"
               onClick={onSubmit}
               disabled={!checkFieldsValidation()}
+              sx={{
+                backgroundColor: "#FFC107",
+                color: "#000",
+                fontWeight: 600,
+                boxShadow: "0 4px 15px rgba(255, 193, 7, 0.4), 0 0 20px rgba(255, 193, 7, 0.2)",
+                "&:hover": {
+                  backgroundColor: "#FFB300",
+                  boxShadow: "0 6px 20px rgba(255, 193, 7, 0.5), 0 0 25px rgba(255, 193, 7, 0.3)",
+                  transform: "translateY(-1px)",
+                },
+                "&:active": {
+                  transform: "translateY(0)",
+                },
+                "&:disabled": {
+                  backgroundColor: "#ccc",
+                  color: "#666",
+                  boxShadow: "none",
+                },
+                transition: "all 0.3s ease",
+              }}
             >
               {t("common.create")}
             </Button>

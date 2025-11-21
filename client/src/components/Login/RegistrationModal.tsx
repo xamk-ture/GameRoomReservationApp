@@ -16,20 +16,24 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [errorParams, setErrorParams] = useState<Record<string, any> | null>(null);
 
   const handleSend = async () => {
     if (!email.endsWith("@edu.xamk.fi")) {
-      setError(t("errors.invalidUniversityEmail"));
+      setErrorKey("errors.invalidUniversityEmail");
+      setErrorParams(null);
       return;
     }
     try {
       await onSend(email);
       setEmail("");
-      setError("");
+      setErrorKey(null);
+      setErrorParams(null);
       onClose();
     } catch (e: any) {
-      setError(t("errors.registrationEmailFailed", { error: e.message || e }));
+      setErrorKey("errors.registrationEmailFailed");
+      setErrorParams({ error: e.message || e });
     }
   };
 
@@ -62,14 +66,32 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
             fullWidth
             margin="normal"
           />
-          {error && (
+          {errorKey && (
             <Typography color="error" variant="body2">
-              {error}
+              {errorParams ? t(errorKey, errorParams) : t(errorKey)}
             </Typography>
           )}
         </Box>
         <Box sx={styles.buttons}>
-          <Button variant="contained" onClick={handleSend}>
+          <Button
+            variant="contained"
+            onClick={handleSend}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
             {t("registration.send")}
           </Button>
           <Button variant="outlined" onClick={onClose}>

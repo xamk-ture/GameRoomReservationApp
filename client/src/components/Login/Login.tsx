@@ -10,7 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { OpenAPI } from "../../api/core/OpenAPI";
 import { PlayerDto } from "../../api/api";
-import gameRoomImage from "../../assets/gameroomimage.svg";
+import loginBackground from "../../assets/login-background.jpg";
 import { enqueueSnackbar } from "notistack";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthProvider";
@@ -25,7 +25,7 @@ const Login: React.FC = () => {
   // Do NOT auto-redirect on load; always show login. Redirect only after verify.
 
   const [playerDto, setPlayerDto] = useState<PlayerDto>({});
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
@@ -33,7 +33,7 @@ const Login: React.FC = () => {
 
   //Handle email changes
   const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
+    setErrorKey(null);
     setPlayerDto((prev) => ({
       ...prev,
       email: event.target.value,
@@ -42,10 +42,10 @@ const Login: React.FC = () => {
 
   // Lähetä kertakäyttökoodi sähköpostiin
   const handleSendCode = async () => {
-    setError(null);
+    setErrorKey(null);
     const email = playerDto.email?.trim() || "";
     if (!email || (!email.endsWith("@edu.xamk.fi") && !email.endsWith("@xamk.fi"))) {
-      setError(t("errors.onlySchoolEmails"));
+      setErrorKey("errors.onlySchoolEmails");
       return;
     }
     setIsSending(true);
@@ -57,6 +57,7 @@ const Login: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
+        credentials: 'include', // Required for cookies and authentication
       });
       // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log("[DEV] request-code status:", resp.status);
@@ -85,7 +86,7 @@ const Login: React.FC = () => {
       setCodeSent(true);
       enqueueSnackbar(t("notify.codeSent"), { variant: "success", autoHideDuration: 4000 });
     } catch (e: any) {
-      setError(t("errors.generic"));
+      setErrorKey("errors.generic");
       enqueueSnackbar(t("notify.sendFailed"), { variant: "error", autoHideDuration: 5000 });
     } finally {
       setIsSending(false);
@@ -94,10 +95,10 @@ const Login: React.FC = () => {
 
   // Vahvista koodi ja kirjaudu sisään
   const handleVerifyCode = async () => {
-    setError(null);
+    setErrorKey(null);
     const email = playerDto.email?.trim() || "";
     if (!email || !code.trim()) {
-      setError(t("errors.generic"));
+      setErrorKey("errors.generic");
       return;
     }
     setIsVerifying(true);
@@ -107,6 +108,7 @@ const Login: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: code.trim() }),
+        credentials: 'include', // Required for cookies and authentication
       });
       if (!resp.ok) throw new Error();
       const data = await resp.json();
@@ -136,7 +138,7 @@ const Login: React.FC = () => {
         navigate(isAdmin ? "/admin" : "/profile");
       }
     } catch (e: any) {
-      setError(t("errors.generic"));
+      setErrorKey("errors.generic");
       enqueueSnackbar(t("notify.verifyFailed"), { variant: "error", autoHideDuration: 5000 });
     } finally {
       setIsVerifying(false);
@@ -180,19 +182,34 @@ const Login: React.FC = () => {
             />
           )}
 
-          {error && (
+          {errorKey && (
             <Typography color="error" variant="body1" sx={{ mt: 1 }}>
-              {error}
+              {t(errorKey)}
             </Typography>
           )}
 
           {!codeSent ? (
             <Button
               variant="contained"
-              color="primary"
               onClick={handleSendCode}
               disabled={isSending}
-              sx={{ mt: 2, width: "100%" }}
+              sx={{
+                mt: 2,
+                width: "100%",
+                backgroundColor: "#ffaa00",
+                color: "#000",
+                fontWeight: 600,
+                boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+                "&:hover": {
+                  backgroundColor: "#e69900",
+                  boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                  transform: "translateY(-1px)",
+                },
+                "&:active": {
+                  transform: "translateY(0)",
+                },
+                transition: "all 0.3s ease",
+              }}
             >
               {isSending ? t("login.sending") : t("login.sendCode")}
             </Button>
@@ -200,16 +217,36 @@ const Login: React.FC = () => {
             <>
               <Button
                 variant="contained"
-                color="primary"
                 onClick={handleVerifyCode}
                 disabled={isVerifying || code.trim().length === 0}
-                sx={{ mt: 2, width: "100%" }}
+                sx={{
+                  mt: 2,
+                  width: "100%",
+                  backgroundColor: "#FFC107",
+                  color: "#000",
+                  fontWeight: 600,
+                  boxShadow: "0 4px 15px rgba(255, 193, 7, 0.4), 0 0 20px rgba(255, 193, 7, 0.2)",
+                  "&:hover": {
+                    backgroundColor: "#FFB300",
+                    boxShadow: "0 6px 20px rgba(255, 193, 7, 0.5), 0 0 25px rgba(255, 193, 7, 0.3)",
+                    transform: "translateY(-1px)",
+                  },
+                  "&:active": {
+                    transform: "translateY(0)",
+                  },
+                  "&:disabled": {
+                    backgroundColor: "#ccc",
+                    color: "#666",
+                    boxShadow: "none",
+                  },
+                  transition: "all 0.3s ease",
+                }}
               >
                 {isVerifying ? t("login.verifying") : t("login.verify")}
               </Button>
               <Button
                 variant="outlined"
-                color="secondary"
+                color="error"
                 onClick={() => {
                   setCode("");
                   setCodeSent(false);
@@ -233,7 +270,7 @@ export default Login;
 
 const styles = {
   background: {
-    backgroundImage: `url(${gameRoomImage})`,
+    backgroundImage: `url(${loginBackground})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",

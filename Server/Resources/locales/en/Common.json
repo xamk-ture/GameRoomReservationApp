@@ -1,0 +1,8 @@
+{
+ "admin.users.confirmDeleteBody": "Are you sure you want to permanently delete {{count}} user(s)? This cannot be undone.",
+ "admin.users.noUsers": "No users found",
+ "admin.devices.statusUnavailable": "Unavailable",
+ "admin.devices.noDevices": "No devices found",
+ "admin.bookings.deselectAll": "Deselect all",
+ "admin.bookings.noBookings": "No bookings found"
+}

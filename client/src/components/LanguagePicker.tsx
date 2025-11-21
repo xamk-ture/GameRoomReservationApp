@@ -1,35 +1,24 @@
-import React, { useEffect } from "react";
-import { Autocomplete, TextField, Stack } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { IconButton, Menu, MenuItem, Typography, Tooltip } from "@mui/material";
+import LanguageIcon from "@mui/icons-material/Language";
 import { useTranslation } from "react-i18next";
 import locales from "../i18n/locales";
 
-// Example: Map locale code to icon URL if available.
-// Uncomment and adjust the paths if you have flag icons.
-// import fi from "../assets/icons/finland-flag.png";
-// import en from "../assets/icons/england-flag.png";
-// import ar from "../assets/icons/saudiarabia-flag.png";
-// const localeIcons: Record<string, string> = {
-//   fi,
-//   en,
-//   ar,
-// };
-
-// const localeIcons: Record<string, any> = {
-//   // If you have flag icons, map them here, otherwise leave empty.
-// };
-
 const LanguagePicker = () => {
   const { t, i18n } = useTranslation();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
 
-  // Use localStorage to pick the default language or fallback to Finnish ("fi")
-  const defaultLangCode = localStorage.getItem("lang") || "fi";
-
-  // Force the language to the default if not already set
+  // Initialize language from localStorage or use current i18n language
   useEffect(() => {
-    if (i18n.language !== defaultLangCode) {
-      i18n.changeLanguage(defaultLangCode);
+    const savedLang = localStorage.getItem("lang");
+    if (savedLang && i18n.language !== savedLang) {
+      i18n.changeLanguage(savedLang);
+    } else if (!savedLang && !i18n.language) {
+      // Only set default if no language is set at all
+      i18n.changeLanguage("fi");
     }
-  }, [defaultLangCode, i18n]);
+  }, [i18n]);
 
   // Convert your locales object to an array of language options.
   const languageOptions = Object.keys(locales)
@@ -45,69 +34,109 @@ const LanguagePicker = () => {
     }));
 
   // Determine the currently selected language.
-  // Use i18n.language if available; if not, force the default "fi".
   const currentLanguage =
     languageOptions.find((option) => option.code === i18n.language) ||
     languageOptions.find((option) => option.code === "fi") ||
     languageOptions[0];
 
-  // Handle language change from the autocomplete.
-  const handleLanguageSelect = (
-    _: React.SyntheticEvent,
-    newValue: { code: string; nativeName: string; englishName: string } | null
-  ) => {
-    if (newValue) {
-      i18n.changeLanguage(newValue.code);
-      localStorage.setItem("lang", newValue.code);
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLanguageSelect = async (code: string) => {
+    if (code === i18n.language) {
+      handleClose();
+      return;
     }
+    localStorage.setItem("lang", code);
+    try {
+      await i18n.changeLanguage(code);
+    } catch (error) {
+      console.error("Failed to change language:", error);
+    }
+    handleClose();
   };
 
   return (
-    <Stack spacing={1}>
-      <Autocomplete
-        options={languageOptions}
-        getOptionLabel={(option) =>
-          option.nativeName !== option.englishName
-            ? `${option.nativeName} - ${option.englishName}`
-            : option.nativeName
-        }
-        value={currentLanguage}
-        onChange={handleLanguageSelect}
-        isOptionEqualToValue={(option, value) => option.code === value.code}
-        renderOption={(props, option) => (
-          <li {...props} key={option.code}>
-            {option.nativeName !== option.englishName ? (
-              <>
-                {option.nativeName} -{" "}
-                <span dir="ltr">{option.englishName}</span>
-              </>
-            ) : (
-              option.nativeName
-            )}
-          </li>
-        )}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label={t("Language")}
-            variant="standard"
-            inputProps={{
-              ...params.inputProps,
-              readOnly: true,
+    <>
+      <Tooltip title={t("Language")}>
+        <IconButton
+          onClick={handleClick}
+          size="small"
+          sx={{
+            backgroundColor: "#ffaa00",
+            color: "#000",
+            boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+            "&:hover": {
+              backgroundColor: "#e69900",
+              boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+              transform: "translateY(-1px)",
+            },
+            "&:active": {
+              transform: "translateY(0)",
+            },
+            transition: "all 0.3s ease",
+          }}
+          aria-label={t("Language")}
+          aria-controls={open ? "language-menu" : undefined}
+          aria-haspopup="true"
+          aria-expanded={open ? "true" : undefined}
+        >
+          <LanguageIcon />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        id="language-menu"
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        MenuListProps={{
+          "aria-labelledby": "language-button",
+          onClick: (e) => {
+            // Prevent menu from closing when clicking inside it
+            e.stopPropagation();
+          },
+        }}
+        transformOrigin={{ horizontal: "right", vertical: "top" }}
+        anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+        PaperProps={{
+          sx: {
+            mt: 1.5,
+            minWidth: 180,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          },
+        }}
+      >
+        {languageOptions.map((option) => (
+          <MenuItem
+            key={option.code}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLanguageSelect(option.code);
             }}
+            selected={option.code === currentLanguage?.code}
             sx={{
-              "& .MuiInputBase-root": { cursor: "pointer" },
-              "& .MuiInputBase-input": { cursor: "pointer" },
-              cursor: "pointer",
+              py: 1.5,
+              px: 2,
+              "&.Mui-selected": {
+                backgroundColor: "action.selected",
+                "&:hover": {
+                  backgroundColor: "action.selected",
+                },
+              },
             }}
-          />
-        )}
-        clearOnEscape
-        disableClearable
-        openOnFocus
-        sx={{ width: { xs: "100%", sm: 300 } }}
-      />
-    </Stack>
+          >
+            <Typography variant="body1" fontWeight={option.code === currentLanguage?.code ? 600 : 400}>
+              {option.nativeName}
+            </Typography>
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
   );
 };
 

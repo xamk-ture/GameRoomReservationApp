@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using gameroombookingsys.IService;
 using gameroombookingsys.DTOs;
 using gameroombookingsys.Helpers;
+using Microsoft.Extensions.Configuration;
+using Azure.Communication.Email;
 
 namespace gameroombookingsys.Controllers
 {
@@ -11,11 +13,13 @@ namespace gameroombookingsys.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IConfiguration configuration)
         {
             _authService = authService;
             _logger = logger;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -116,5 +120,6 @@ namespace gameroombookingsys.Controllers
             var removed = await _authService.CleanupExpiredAsync();
             return Ok(new { removed });
         }
+
     }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { api, DeviceDto, RoomBookingDto, PlayerDto, BookingStatus } from "../../api/api";
 import { useTranslation } from "react-i18next";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel, Alert, Card, CardContent, useTheme, useMediaQuery, Chip } from "@mui/material";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 
@@ -18,6 +18,8 @@ interface DeviceAvailability {
 }
 
 const AdminBookings = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [bookings, setBookings] = useState<RoomBookingDto[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [open, setOpen] = useState(false);
@@ -29,6 +31,10 @@ const AdminBookings = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [playerFilter, setPlayerFilter] = useState<string>("");
+  const [timeFilter, setTimeFilter] = useState<"all" | "upcoming" | "past">("all");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [bookingToDelete, setBookingToDelete] = useState<RoomBookingDto | null>(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const { t, i18n } = useTranslation();
 
   const load = async () => {
@@ -45,7 +51,7 @@ const AdminBookings = () => {
   // Calculate device availability based on bookings
   const availabilityMap = useMemo(() => {
     const map = new Map<number, DeviceAvailability>();
-    
+
     if (!open || !form.bookingDateTime || !form.duration) {
       return map;
     }
@@ -72,20 +78,20 @@ const AdminBookings = () => {
       if (!device.id) return;
 
       const totalQuantity = device.quantity ?? 0;
-      
+
       // Count how many of this device are booked during the requested time
       let bookedCount = 0;
       activeBookings.forEach(booking => {
         if (!booking.bookingDateTime) return;
-        
+
         // Normalize booking time - server returns ISO strings
         const bookingStart = dayjs(booking.bookingDateTime);
         const bookingEnd = bookingStart.add(booking.duration ?? 0, 'hour');
-        
+
         // Check if booking overlaps with requested time
         // Overlap: bookingStart < endTime AND bookingEnd > startTime
         const overlaps = bookingStart.isBefore(endTime) && bookingEnd.isAfter(startTime);
-        
+
         if (overlaps && booking.devices) {
           // Check if this booking uses the device
           const usesDevice = booking.devices.some(d => d.id === device.id);
@@ -116,7 +122,7 @@ const AdminBookings = () => {
 
         // Find the earliest end time (when device becomes available)
         if (overlappingBookings.length > 0) {
-          const earliestEnd = overlappingBookings.reduce((earliest, current) => 
+          const earliestEnd = overlappingBookings.reduce((earliest, current) =>
             current.isBefore(earliest) ? current : earliest
           );
           nextAvailableTime = earliestEnd.toISOString();
@@ -141,32 +147,68 @@ const AdminBookings = () => {
     return availability ? availability.availableQuantity === 0 : false;
   };
 
-  const handleDelete = async (id?: number) => {
-    if (!id) return;
-    await api.RoomBookingsService.deleteBooking(id);
-    await load();
+  const handleDelete = (booking: RoomBookingDto) => {
+    setBookingToDelete(booking);
+    setDeleteConfirmOpen(true);
   };
 
-  const handleBulkDelete = async () => {
-    for (const id of selected) await api.RoomBookingsService.deleteBooking(id);
-    setSelected([]);
-    await load();
-    setSnack(t("admin.bookings.deletedSelected"));
+  const confirmDelete = async () => {
+    if (!bookingToDelete?.id) return;
+    try {
+      await api.RoomBookingsService.deleteBooking(bookingToDelete.id);
+      setDeleteConfirmOpen(false);
+      setBookingToDelete(null);
+      await load();
+      setSnack(t("admin.bookings.bookingDeleted") || "Booking deleted successfully");
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      setErrorMsg(t("errors.bookingDeleteFailed") || "Failed to delete booking");
+    }
   };
 
-  const openCreate = () => { 
-    setEditing(null); 
-    setForm({ 
-      bookingDateTime: "", 
-      duration: 1, 
-      isPlayingAlone: true, 
+  const handleBulkDelete = () => {
+    setBulkDeleteConfirmOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      for (const id of selected) {
+        await api.RoomBookingsService.deleteBooking(id);
+      }
+      setSelected([]);
+      setBulkDeleteConfirmOpen(false);
+      await load();
+      setSnack(t("admin.bookings.deletedSelected"));
+    } catch (error) {
+      console.error("Error deleting bookings:", error);
+      setErrorMsg(t("errors.bookingDeleteFailed") || "Failed to delete bookings");
+    }
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      bookingDateTime: "",
+      duration: 1,
+      isPlayingAlone: true,
       fellows: 0,
       deviceId: undefined,
       playerId: undefined
-    }); 
-    setOpen(true); 
+    });
+    setOpen(true);
   };
   const openEdit = (booking: RoomBookingDto) => {
+    // Check if booking is ongoing (has started but not ended)
+    const now = dayjs();
+    const bookingStart = dayjs(booking.bookingDateTime as any);
+    const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+    
+    // If booking has started but not ended, it's ongoing
+    if (bookingStart.isBefore(now) && bookingEnd.isAfter(now)) {
+      setSnack(t("admin.bookings.cannotEditOngoing"));
+      return;
+    }
+    
     setEditing(booking);
     const deviceId = (booking.devices || [])[0]?.id;
     setForm({
@@ -235,12 +277,12 @@ const AdminBookings = () => {
             playerId: form.playerId,
           }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ Message: `HTTP ${response.status}: ${response.statusText}` }));
           throw new Error(errorData.Message || errorData.message || t("errors.badRequest"));
         }
-        
+
         setSnack(t("admin.bookings.bookingCreated"));
       }
     } catch (e: any) {
@@ -313,18 +355,40 @@ const AdminBookings = () => {
     return sorted;
   }, [bookings, sortOrder]);
 
-  // Filter bookings by player email prefix
+  // Filter bookings by player email prefix and time
   const filteredBookings = useMemo(() => {
-    if (!playerFilter.trim()) {
-      return sortedBookings;
+    let filtered = sortedBookings;
+    
+    // Filter by time (upcoming/past)
+    if (timeFilter !== "all") {
+      const now = dayjs();
+      filtered = filtered.filter((booking: RoomBookingDto) => {
+        const bookingStart = dayjs(booking.bookingDateTime as any);
+        const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+        
+        if (timeFilter === "upcoming") {
+          // Show upcoming or ongoing bookings (not yet ended)
+          return bookingEnd.isAfter(now);
+        } else if (timeFilter === "past") {
+          // Show past bookings (already ended)
+          return bookingEnd.isBefore(now) || bookingEnd.isSame(now);
+        }
+        return true;
+      });
     }
-    const filterLower = playerFilter.toLowerCase().trim();
-    return sortedBookings.filter((booking: RoomBookingDto) => {
-      const playerEmail = (booking as any).playerEmail || "";
-      const emailPrefix = formatEmailPrefix(playerEmail).toLowerCase();
-      return emailPrefix.includes(filterLower);
-    });
-  }, [sortedBookings, playerFilter]);
+    
+    // Filter by player email prefix
+    if (playerFilter.trim()) {
+      const filterLower = playerFilter.toLowerCase().trim();
+      filtered = filtered.filter((booking: RoomBookingDto) => {
+        const playerEmail = (booking as any).playerEmail || "";
+        const emailPrefix = formatEmailPrefix(playerEmail).toLowerCase();
+        return emailPrefix.includes(filterLower);
+      });
+    }
+    
+    return filtered;
+  }, [sortedBookings, playerFilter, timeFilter]);
 
   const handleSelectAll = () => {
     if (selected.length === filteredBookings.length && filteredBookings.length > 0) {
@@ -339,72 +403,216 @@ const AdminBookings = () => {
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ mb: 2 }}>{t("admin.bookings.manageTitle")}</Typography>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
-        <Button variant="contained" onClick={openCreate}>{t("admin.bookings.add")}</Button>
-        <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>{t("common.deleteSelected")}</Button>
-        <Button variant="outlined" onClick={load}>{t("admin.bookings.update")}</Button>
-        <TextField
-          size="small"
-          label={t("admin.bookings.searchByPlayer")}
-          value={playerFilter}
-          onChange={(e) => setPlayerFilter(e.target.value)}
-          sx={{ minWidth: 200 }}
-          placeholder={t("admin.bookings.playerEmailPrefix")}
-        />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>{t("admin.bookings.sortBy")}</InputLabel>
-          <Select
-            value={sortOrder}
-            label={t("admin.bookings.sortBy")}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-          >
-            <MenuItem value="newest">{t("admin.bookings.newestFirst")}</MenuItem>
-            <MenuItem value="oldest">{t("admin.bookings.oldestFirst")}</MenuItem>
-            <MenuItem value="next">{t("admin.bookings.upcomingFirst")}</MenuItem>
-            <MenuItem value="previous">{t("admin.bookings.oldestPastFirst")}</MenuItem>
-          </Select>
-        </FormControl>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold">{t("admin.bookings.manageTitle")}</Typography>
       </Box>
-      {errorMsg && <Typography color="error" sx={{ mb: 1 }}>{errorMsg}</Typography>}
-      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-        <Table sx={{ minWidth: 650 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell width={24}>
-                <input
-                  type="checkbox"
-                  checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
-                  onChange={handleSelectAll}
-                  title={selected.length === filteredBookings.length && filteredBookings.length > 0 ? t("admin.bookings.deselectAll") : t("admin.bookings.selectAll")}
-                />
-              </TableCell>
-              <TableCell>{t("common.id")}</TableCell>
-              <TableCell>{t("admin.bookings.player")}</TableCell>
-              <TableCell>{t("admin.bookings.start")}</TableCell>
-              <TableCell>{t("admin.bookings.end")}</TableCell>
-              <TableCell align="right">{t("common.actions")}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredBookings.map((booking: RoomBookingDto) => (
-              <TableRow key={booking.id}>
-                <TableCell>
-                  <input type="checkbox" checked={selected.includes(booking.id!)} onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))} />
-                </TableCell>
-                <TableCell>{booking.id}</TableCell>
-                <TableCell>{formatEmailPrefix((booking as any).playerEmail)}</TableCell>
-                <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
-                <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
-                <TableCell align="right">
-                  <Button sx={{ mr: 1 }} variant="text" onClick={() => openEdit(booking)}>{t("common.edit")}</Button>
-                  <Button color="error" variant="outlined" onClick={() => handleDelete(booking.id!)}>{t("common.delete")}</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <Button
+            variant="contained"
+            onClick={openCreate}
+            startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {t("admin.bookings.add")}
+          </Button>
+          <Button variant="outlined" onClick={load}>
+            {t("admin.bookings.update")}
+          </Button>
+          <Box sx={{ flexGrow: 1 }} />
+          <TextField
+            size="small"
+            label={t("admin.bookings.searchByPlayer")}
+            value={playerFilter}
+            onChange={(e) => setPlayerFilter(e.target.value)}
+            sx={{ minWidth: 200 }}
+            placeholder={t("admin.bookings.playerEmailPrefix")}
+          />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>{t("admin.bookings.filterByTime")}</InputLabel>
+            <Select
+              value={timeFilter}
+              label={t("admin.bookings.filterByTime")}
+              onChange={(e) => setTimeFilter(e.target.value as "all" | "upcoming" | "past")}
+            >
+              <MenuItem value="all">{t("admin.bookings.allBookings")}</MenuItem>
+              <MenuItem value="upcoming">{t("admin.bookings.upcomingAndOngoing")}</MenuItem>
+              <MenuItem value="past">{t("admin.bookings.pastBookings")}</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>{t("admin.bookings.sortBy")}</InputLabel>
+            <Select
+              value={sortOrder}
+              label={t("admin.bookings.sortBy")}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+            >
+              <MenuItem value="newest">{t("admin.bookings.newestFirst")}</MenuItem>
+              <MenuItem value="oldest">{t("admin.bookings.oldestFirst")}</MenuItem>
+              <MenuItem value="next">{t("admin.bookings.upcomingFirst")}</MenuItem>
+              <MenuItem value="previous">{t("admin.bookings.oldestPastFirst")}</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>
+            {t("common.deleteSelected")} ({selected.length})
+          </Button>
+        </Box>
+
+        {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
+
+        {isMobile ? (
+          // Mobile card view
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {filteredBookings.map((booking: RoomBookingDto) => {
+              const isPast = dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').isBefore(dayjs());
+              const isCancelled = booking.status === BookingStatus.CANCELLED;
+
+              return (
+                <Card key={booking.id} sx={{ border: 1, borderColor: "divider", opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 2 }}>
+                      <Checkbox 
+                        checked={selected.includes(booking.id!)} 
+                        onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))}
+                        sx={{ mt: -1, ml: -1 }}
+                      />
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexWrap: "wrap" }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            {formatEmailPrefix((booking as any).playerEmail)}
+                          </Typography>
+                          {isCancelled && (
+                            <Chip label="CANCELLED" color="error" size="small" />
+                          )}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          <strong>{t("admin.bookings.start")}:</strong> {formatDateTime(booking.bookingDateTime)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          <strong>{t("admin.bookings.end")}:</strong> {endFrom(booking.bookingDateTime as any, booking.duration)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          <strong>{t("admin.bookings.devices")}:</strong> {(booking.devices || []).map(d => d.name).join(", ") || "-"}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            onClick={() => openEdit(booking)}
+                            disabled={(() => {
+                              const now = dayjs();
+                              const bookingStart = dayjs(booking.bookingDateTime as any);
+                              const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+                              return bookingStart.isBefore(now) && bookingEnd.isAfter(now);
+                            })()}
+                          >
+                            {t("common.edit")}
+                          </Button>
+                          <Button size="small" color="error" variant="contained" onClick={() => handleDelete(booking)}>
+                            {t("common.delete")}
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {filteredBookings.length === 0 && (
+              <Box sx={{ py: 3, textAlign: "center" }}>
+                <Typography color="text.secondary">{t("admin.bookings.noBookings")}</Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          // Desktop table view
+          <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead sx={{ bgcolor: "action.hover" }}>
+                <TableRow>
+                  <TableCell width={40}>
+                    <Checkbox
+                      checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
+                      indeterminate={selected.length > 0 && selected.length < filteredBookings.length}
+                      onChange={handleSelectAll}
+                    />
+                  </TableCell>
+                  <TableCell><strong>{t("admin.bookings.player")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.bookings.start")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.bookings.end")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.bookings.devices")}</strong></TableCell>
+                  <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredBookings.map((booking: RoomBookingDto) => {
+                  const isPast = dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').isBefore(dayjs());
+                  const isCancelled = booking.status === BookingStatus.CANCELLED;
+
+                  return (
+                    <TableRow key={booking.id} hover sx={{ opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.includes(booking.id!)}
+                          onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {formatEmailPrefix((booking as any).playerEmail)}
+                        {isCancelled && <Box component="span" sx={{ ml: 1, px: 0.5, py: 0, bgcolor: "error.light", color: "error.contrastText", borderRadius: 0.5, fontSize: "0.7rem" }}>CANCELLED</Box>}
+                      </TableCell>
+                      <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
+                      <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
+                      <TableCell>
+                        {(booking.devices || []).map(d => d.name).join(", ") || "-"}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button 
+                          size="small" 
+                          sx={{ mr: 1 }} 
+                          variant="outlined" 
+                          onClick={() => openEdit(booking)}
+                          disabled={(() => {
+                            const now = dayjs();
+                            const bookingStart = dayjs(booking.bookingDateTime as any);
+                            const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+                            return bookingStart.isBefore(now) && bookingEnd.isAfter(now);
+                          })()}
+                        >
+                          {t("common.edit")}
+                        </Button>
+                        <Button size="small" color="error" variant="contained" onClick={() => handleDelete(booking)}>{t("common.delete")}</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredBookings.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary">{t("admin.bookings.noBookings")}</Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
 
       <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
         <DialogTitle>{editing ? t("admin.bookings.edit") : t("admin.bookings.add")}</DialogTitle>
@@ -455,18 +663,18 @@ const AdminBookings = () => {
                 // OR if we're still fetching (show loading)
                 const hasValidDateTime = form.bookingDateTime && form.duration;
                 const showAvailability = hasValidDateTime && availability !== undefined;
-                
+
                 return (
                   <MenuItem key={device.id} value={device.id} title={device.description || ""} disabled={fullyBooked}>
                     <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span>{device.name || `#${device.id}`}</span>
                         {showAvailability && (
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
+                          <Typography
+                            variant="caption"
+                            sx={{
                               ml: 1,
-                              color: availability 
+                              color: availability
                                 ? (fullyBooked ? "error.main" : availability.availableQuantity > 0 ? "success.main" : "warning.main")
                                 : "text.secondary",
                               fontWeight: "medium"
@@ -474,10 +682,10 @@ const AdminBookings = () => {
                           >
                             {availability
                               ? (fullyBooked && availability.nextAvailableTime
-                                ? t("bookings.deviceNextAvailable", { 
-                                    time: dayjs(availability.nextAvailableTime).format(i18n.language === "en" ? "h:mm A" : "HH.mm"),
-                                    date: dayjs(availability.nextAvailableTime).format("DD.MM.YYYY")
-                                  })
+                                ? t("bookings.deviceNextAvailable", {
+                                  time: dayjs(availability.nextAvailableTime).format(i18n.language === "en" ? "h:mm A" : "HH.mm"),
+                                  date: dayjs(availability.nextAvailableTime).format("DD.MM.YYYY")
+                                })
                                 : t("bookings.deviceAvailable", { available: availability.availableQuantity, total: availability.totalQuantity }))
                               : `${device.quantity ?? 0}/${device.quantity ?? 0}`}
                           </Typography>
@@ -497,14 +705,158 @@ const AdminBookings = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDialog}>{t("common.cancel")}</Button>
-          <Button variant="contained" onClick={submit}>{editing ? t("common.save") : t("common.create")}</Button>
+          <Button
+            variant="contained"
+            onClick={submit}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {editing ? t("common.save") : t("common.create")}
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar 
-        open={!!snack} 
-        message={snack || ""} 
-        autoHideDuration={2000} 
+      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("admin.bookings.confirmDeleteBody", { count: selected.length })}
+          </Typography>
+          {selected.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto", border: '1px solid #ccc', p: 1, borderRadius: 1 }}>
+              {filteredBookings
+                .filter((booking: RoomBookingDto) => selected.includes(booking.id!))
+                .map((booking: RoomBookingDto) => (
+                  <Typography key={booking.id} variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+                    • {formatEmailPrefix((booking as any).playerEmail)} - {formatDateTime(booking.bookingDateTime)}
+                  </Typography>
+                ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmBulkDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("bookings.confirmDelete")}
+          </Typography>
+          {bookingToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.player")}:</strong> {formatEmailPrefix((bookingToDelete as any).playerEmail)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.start")}:</strong> {formatDateTime(bookingToDelete.bookingDateTime)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{t("admin.bookings.devices")}:</strong> {(bookingToDelete.devices || []).map(d => d.name).join(", ") || "-"}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("admin.bookings.confirmDeleteBody", { count: selected.length })}
+          </Typography>
+          {selected.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto", border: '1px solid #ccc', p: 1, borderRadius: 1 }}>
+              {filteredBookings
+                .filter((booking: RoomBookingDto) => selected.includes(booking.id!))
+                .map((booking: RoomBookingDto) => (
+                  <Typography key={booking.id} variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
+                    • {formatEmailPrefix((booking as any).playerEmail)} - {formatDateTime(booking.bookingDateTime)}
+                  </Typography>
+                ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmBulkDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("bookings.confirmDelete")}
+          </Typography>
+          {bookingToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.player")}:</strong> {formatEmailPrefix((bookingToDelete as any).playerEmail)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <strong>{t("admin.bookings.start")}:</strong> {formatDateTime(bookingToDelete.bookingDateTime)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{t("admin.bookings.devices")}:</strong> {(bookingToDelete.devices || []).map(d => d.name).join(", ") || "-"}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setBookingToDelete(null); }}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+          >
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!snack}
+        message={snack || ""}
+        autoHideDuration={2000}
         onClose={() => setSnack(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />

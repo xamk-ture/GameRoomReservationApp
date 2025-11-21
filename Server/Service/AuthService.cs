@@ -57,29 +57,35 @@ namespace gameroombookingsys.Service
             });
 
             // Send email with login code
+            _logger.LogInformation("[DEBUG] Attempting to send login code email to {Email} with code {Code} (Language: {Language})", email, code, language);
             try
             {
                 await _emailService.SendLoginCodeAsync(email, code, language);
-                _logger.LogInformation("Login code email sent successfully to {Email} in language {Language}", email, language);
+                _logger.LogInformation("[DEBUG] Login code email sent successfully to {Email} in language {Language}", email, language);
             }
             catch (SocketException ex)
             {
-                _logger.LogError(ex, "Network error while sending login code email to {Email}", email);
+                _logger.LogError(ex, "[ERROR] Network error while sending login code email to {Email}. Error: {Message}", email, ex.Message);
                 // Don't throw - code is still generated and stored, user can request it again if needed
             }
             catch (IOException ex)
             {
-                _logger.LogError(ex, "IO error while sending login code email to {Email}", email);
+                _logger.LogError(ex, "[ERROR] IO error while sending login code email to {Email}. Error: {Message}", email, ex.Message);
                 // Don't throw - code is still generated and stored, user can request it again if needed
             }
             catch (ArgumentException ex)
             {
-                _logger.LogError(ex, "Configuration error while sending login code email to {Email}", email);
+                _logger.LogError(ex, "[ERROR] Configuration error while sending login code email to {Email}. Error: {Message}", email, ex.Message);
+                // Don't throw - code is still generated and stored, user can request it again if needed
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "[ERROR] Invalid operation while sending login code email to {Email}. Error: {Message}", email, ex.Message);
                 // Don't throw - code is still generated and stored, user can request it again if needed
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error while sending login code email to {Email}", email);
+                _logger.LogError(ex, "[ERROR] Unexpected error while sending login code email to {Email}. Error: {Message}, StackTrace: {StackTrace}", email, ex.Message, ex.StackTrace);
                 // Don't throw - code is still generated and stored, user can request it again if needed
             }
 
