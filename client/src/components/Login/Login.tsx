@@ -19,7 +19,7 @@ import LanguagePicker from "../LanguagePicker";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { setToken } = useAuth();
 
   // Do NOT auto-redirect on load; always show login. Redirect only after verify.
@@ -55,7 +55,10 @@ const Login: React.FC = () => {
       if (import.meta.env.DEV) console.log("[DEV] POST", `${base}/api/auth/request-code`);
       const resp = await fetch(`${base}/api/auth/request-code`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept-Language": i18n.language || "fi"
+        },
         body: JSON.stringify({ email }),
         credentials: 'include', // Required for cookies and authentication
       });
@@ -106,7 +109,10 @@ const Login: React.FC = () => {
       const base = OpenAPI.BASE || "";
       const resp = await fetch(`${base}/api/auth/verify-code`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept-Language": i18n.language || "fi"
+        },
         body: JSON.stringify({ email, code: code.trim() }),
         credentials: 'include', // Required for cookies and authentication
       });
