@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { IconButton, Menu, MenuItem, Typography, Box, Tooltip } from "@mui/material";
+import { IconButton, Menu, MenuItem, Typography, Tooltip } from "@mui/material";
 import LanguageIcon from "@mui/icons-material/Language";
 import { useTranslation } from "react-i18next";
 import locales from "../i18n/locales";
@@ -130,16 +130,9 @@ const LanguagePicker = () => {
               },
             }}
           >
-            <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
-              <Typography variant="body1" fontWeight={option.code === currentLanguage?.code ? 600 : 400}>
-                {option.nativeName}
-              </Typography>
-              {option.nativeName !== option.englishName && (
-                <Typography variant="caption" color="text.secondary">
-                  {option.englishName}
-                </Typography>
-              )}
-            </Box>
+            <Typography variant="body1" fontWeight={option.code === currentLanguage?.code ? 600 : 400}>
+              {option.nativeName}
+            </Typography>
           </MenuItem>
         ))}
       </Menu>

@@ -27,6 +27,7 @@ const AdminUsers = () => {
   const [selectedUser, setSelectedUser] = useState<{ email: string; createdAt: string; lastLoginAt: string } | null>(null);
   const [userBookings, setUserBookings] = useState<RoomBookingDto[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [userBookingCounts, setUserBookingCounts] = useState<Record<string, number>>({});
 
   const { t, i18n } = useTranslation();
 
@@ -39,6 +40,25 @@ const AdminUsers = () => {
         setUsers(usersJson || []);
       })
       .catch((e) => setError(e.message));
+    
+    // Load booking counts for all users
+    const loadBookingCounts = async () => {
+      try {
+        const allBookings = await api.RoomBookingsService.getAllBookings();
+        const bookingsArray = Array.isArray(allBookings) ? allBookings : [];
+        const counts: Record<string, number> = {};
+        bookingsArray.forEach((booking: RoomBookingDto) => {
+          const playerEmail = (booking as any).playerEmail || "";
+          if (playerEmail) {
+            counts[playerEmail.toLowerCase()] = (counts[playerEmail.toLowerCase()] || 0) + 1;
+          }
+        });
+        setUserBookingCounts(counts);
+      } catch (error) {
+        console.error("Error loading booking counts:", error);
+      }
+    };
+    loadBookingCounts();
   }, [t]);
 
   // Sort users based on sortOrder
@@ -71,6 +91,19 @@ const AdminUsers = () => {
   }, [sortedUsers, userFilter]);
 
   const formatEmailPrefix = (email?: string | null) => (email ? email.split("@")[0] : "");
+
+  const formatDateOnly = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString(i18n.language === "en" ? "en-GB" : "fi-FI", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+    } catch {
+      return dateString;
+    }
+  };
 
   const formatDateTime = (dateTime?: any) => {
     if (!dateTime) return "";
@@ -219,32 +252,43 @@ const AdminUsers = () => {
             {filteredUsers
               .slice(userPage * rowsPerPage, userPage * rowsPerPage + rowsPerPage)
               .map((u) => (
-                <Card key={u.email} sx={{ border: 1, borderColor: "divider" }}>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 2 }}>
+                <Card 
+                  key={u.email} 
+                  sx={{ 
+                    border: 1, 
+                    borderColor: "divider",
+                    cursor: "pointer",
+                    "&:hover": {
+                      boxShadow: 2,
+                    },
+                    transition: "box-shadow 0.2s",
+                  }}
+                  onClick={() => handleOpenUserDetails(u)}
+                >
+                  <CardContent sx={{ "&:last-child": { pb: 2 } }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Checkbox 
                         checked={selectedEmails.includes(u.email)} 
-                        onChange={(e) => setSelectedEmails((prev) => e.target.checked ? [...prev, u.email] : prev.filter(x => x !== u.email))} 
-                        sx={{ mt: -1, ml: -1 }}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setSelectedEmails((prev) => e.target.checked ? [...prev, u.email] : prev.filter(x => x !== u.email));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{ ml: -1 }}
                       />
                       <Box sx={{ flexGrow: 1 }}>
                         <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                          {u.email}
+                          {formatEmailPrefix(u.email)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                          <strong>{t("common.created")}:</strong> {new Date(u.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}
+                          <strong>{t("common.created")}:</strong> {formatDateOnly(u.createdAt)}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          <strong>{t("admin.users.lastLogin")}:</strong> {new Date(u.lastLoginAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          <strong>{t("admin.users.bookings")}:</strong> {userBookingCounts[u.email.toLowerCase()] || 0}
                         </Typography>
-                        <Button 
-                          size="small" 
-                          variant="outlined"
-                          onClick={() => handleOpenUserDetails(u)}
-                          sx={{ mt: 1 }}
-                        >
-                          {t("common.viewDetails")}
-                        </Button>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>{t("admin.users.lastLogin")}:</strong> {formatDateOnly(u.lastLoginAt)}
+                        </Typography>
                       </Box>
                     </Box>
                   </CardContent>
