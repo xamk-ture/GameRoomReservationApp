@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { api, DeviceDto, RoomBookingDto, PlayerDto, BookingStatus } from "../../api/api";
 import { useTranslation } from "react-i18next";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel, Alert } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel, Alert, Card, CardContent, useTheme, useMediaQuery, Chip } from "@mui/material";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 
@@ -18,6 +18,8 @@ interface DeviceAvailability {
 }
 
 const AdminBookings = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [bookings, setBookings] = useState<RoomBookingDto[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [open, setOpen] = useState(false);
@@ -29,6 +31,7 @@ const AdminBookings = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [playerFilter, setPlayerFilter] = useState<string>("");
+  const [timeFilter, setTimeFilter] = useState<"all" | "upcoming" | "past">("all");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState<RoomBookingDto | null>(null);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
@@ -195,6 +198,17 @@ const AdminBookings = () => {
     setOpen(true);
   };
   const openEdit = (booking: RoomBookingDto) => {
+    // Check if booking is ongoing (has started but not ended)
+    const now = dayjs();
+    const bookingStart = dayjs(booking.bookingDateTime as any);
+    const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+    
+    // If booking has started but not ended, it's ongoing
+    if (bookingStart.isBefore(now) && bookingEnd.isAfter(now)) {
+      setSnack(t("admin.bookings.cannotEditOngoing"));
+      return;
+    }
+    
     setEditing(booking);
     const deviceId = (booking.devices || [])[0]?.id;
     setForm({
@@ -341,18 +355,40 @@ const AdminBookings = () => {
     return sorted;
   }, [bookings, sortOrder]);
 
-  // Filter bookings by player email prefix
+  // Filter bookings by player email prefix and time
   const filteredBookings = useMemo(() => {
-    if (!playerFilter.trim()) {
-      return sortedBookings;
+    let filtered = sortedBookings;
+    
+    // Filter by time (upcoming/past)
+    if (timeFilter !== "all") {
+      const now = dayjs();
+      filtered = filtered.filter((booking: RoomBookingDto) => {
+        const bookingStart = dayjs(booking.bookingDateTime as any);
+        const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+        
+        if (timeFilter === "upcoming") {
+          // Show upcoming or ongoing bookings (not yet ended)
+          return bookingEnd.isAfter(now);
+        } else if (timeFilter === "past") {
+          // Show past bookings (already ended)
+          return bookingEnd.isBefore(now) || bookingEnd.isSame(now);
+        }
+        return true;
+      });
     }
-    const filterLower = playerFilter.toLowerCase().trim();
-    return sortedBookings.filter((booking: RoomBookingDto) => {
-      const playerEmail = (booking as any).playerEmail || "";
-      const emailPrefix = formatEmailPrefix(playerEmail).toLowerCase();
-      return emailPrefix.includes(filterLower);
-    });
-  }, [sortedBookings, playerFilter]);
+    
+    // Filter by player email prefix
+    if (playerFilter.trim()) {
+      const filterLower = playerFilter.toLowerCase().trim();
+      filtered = filtered.filter((booking: RoomBookingDto) => {
+        const playerEmail = (booking as any).playerEmail || "";
+        const emailPrefix = formatEmailPrefix(playerEmail).toLowerCase();
+        return emailPrefix.includes(filterLower);
+      });
+    }
+    
+    return filtered;
+  }, [sortedBookings, playerFilter, timeFilter]);
 
   const handleSelectAll = () => {
     if (selected.length === filteredBookings.length && filteredBookings.length > 0) {
@@ -407,6 +443,18 @@ const AdminBookings = () => {
             sx={{ minWidth: 200 }}
             placeholder={t("admin.bookings.playerEmailPrefix")}
           />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>{t("admin.bookings.filterByTime")}</InputLabel>
+            <Select
+              value={timeFilter}
+              label={t("admin.bookings.filterByTime")}
+              onChange={(e) => setTimeFilter(e.target.value as "all" | "upcoming" | "past")}
+            >
+              <MenuItem value="all">{t("admin.bookings.allBookings")}</MenuItem>
+              <MenuItem value="upcoming">{t("admin.bookings.upcomingAndOngoing")}</MenuItem>
+              <MenuItem value="past">{t("admin.bookings.pastBookings")}</MenuItem>
+            </Select>
+          </FormControl>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>{t("admin.bookings.sortBy")}</InputLabel>
             <Select
@@ -427,63 +475,143 @@ const AdminBookings = () => {
 
         {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
 
-        <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
-          <Table sx={{ minWidth: 650 }}>
-            <TableHead sx={{ bgcolor: "action.hover" }}>
-              <TableRow>
-                <TableCell width={40}>
-                  <Checkbox
-                    checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
-                    indeterminate={selected.length > 0 && selected.length < filteredBookings.length}
-                    onChange={handleSelectAll}
-                  />
-                </TableCell>
-                <TableCell><strong>{t("admin.bookings.player")}</strong></TableCell>
-                <TableCell><strong>{t("admin.bookings.start")}</strong></TableCell>
-                <TableCell><strong>{t("admin.bookings.end")}</strong></TableCell>
-                <TableCell><strong>{t("admin.bookings.devices")}</strong></TableCell>
-                <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredBookings.map((booking: RoomBookingDto) => {
-                const isPast = dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').isBefore(dayjs());
-                const isCancelled = booking.status === BookingStatus.CANCELLED;
+        {isMobile ? (
+          // Mobile card view
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {filteredBookings.map((booking: RoomBookingDto) => {
+              const isPast = dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').isBefore(dayjs());
+              const isCancelled = booking.status === BookingStatus.CANCELLED;
 
-                return (
-                  <TableRow key={booking.id} hover sx={{ opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.includes(booking.id!)}
+              return (
+                <Card key={booking.id} sx={{ border: 1, borderColor: "divider", opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 2 }}>
+                      <Checkbox 
+                        checked={selected.includes(booking.id!)} 
                         onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))}
+                        sx={{ mt: -1, ml: -1 }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      {formatEmailPrefix((booking as any).playerEmail)}
-                      {isCancelled && <Box component="span" sx={{ ml: 1, px: 0.5, py: 0, bgcolor: "error.light", color: "error.contrastText", borderRadius: 0.5, fontSize: "0.7rem" }}>CANCELLED</Box>}
-                    </TableCell>
-                    <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
-                    <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
-                    <TableCell>
-                      {(booking.devices || []).map(d => d.name).join(", ") || "-"}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(booking)}>{t("common.edit")}</Button>
-                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(booking)}>{t("common.delete")}</Button>
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexWrap: "wrap" }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            {formatEmailPrefix((booking as any).playerEmail)}
+                          </Typography>
+                          {isCancelled && (
+                            <Chip label="CANCELLED" color="error" size="small" />
+                          )}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          <strong>{t("admin.bookings.start")}:</strong> {formatDateTime(booking.bookingDateTime)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          <strong>{t("admin.bookings.end")}:</strong> {endFrom(booking.bookingDateTime as any, booking.duration)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          <strong>{t("admin.bookings.devices")}:</strong> {(booking.devices || []).map(d => d.name).join(", ") || "-"}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            onClick={() => openEdit(booking)}
+                            disabled={(() => {
+                              const now = dayjs();
+                              const bookingStart = dayjs(booking.bookingDateTime as any);
+                              const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+                              return bookingStart.isBefore(now) && bookingEnd.isAfter(now);
+                            })()}
+                          >
+                            {t("common.edit")}
+                          </Button>
+                          <Button size="small" color="error" variant="contained" onClick={() => handleDelete(booking)}>
+                            {t("common.delete")}
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {filteredBookings.length === 0 && (
+              <Box sx={{ py: 3, textAlign: "center" }}>
+                <Typography color="text.secondary">{t("admin.bookings.noBookings")}</Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          // Desktop table view
+          <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead sx={{ bgcolor: "action.hover" }}>
+                <TableRow>
+                  <TableCell width={40}>
+                    <Checkbox
+                      checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
+                      indeterminate={selected.length > 0 && selected.length < filteredBookings.length}
+                      onChange={handleSelectAll}
+                    />
+                  </TableCell>
+                  <TableCell><strong>{t("admin.bookings.player")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.bookings.start")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.bookings.end")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.bookings.devices")}</strong></TableCell>
+                  <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredBookings.map((booking: RoomBookingDto) => {
+                  const isPast = dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').isBefore(dayjs());
+                  const isCancelled = booking.status === BookingStatus.CANCELLED;
+
+                  return (
+                    <TableRow key={booking.id} hover sx={{ opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.includes(booking.id!)}
+                          onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {formatEmailPrefix((booking as any).playerEmail)}
+                        {isCancelled && <Box component="span" sx={{ ml: 1, px: 0.5, py: 0, bgcolor: "error.light", color: "error.contrastText", borderRadius: 0.5, fontSize: "0.7rem" }}>CANCELLED</Box>}
+                      </TableCell>
+                      <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
+                      <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
+                      <TableCell>
+                        {(booking.devices || []).map(d => d.name).join(", ") || "-"}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button 
+                          size="small" 
+                          sx={{ mr: 1 }} 
+                          variant="outlined" 
+                          onClick={() => openEdit(booking)}
+                          disabled={(() => {
+                            const now = dayjs();
+                            const bookingStart = dayjs(booking.bookingDateTime as any);
+                            const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+                            return bookingStart.isBefore(now) && bookingEnd.isAfter(now);
+                          })()}
+                        >
+                          {t("common.edit")}
+                        </Button>
+                        <Button size="small" color="error" variant="contained" onClick={() => handleDelete(booking)}>{t("common.delete")}</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredBookings.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary">{t("admin.bookings.noBookings")}</Typography>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-              {filteredBookings.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                    <Typography color="text.secondary">{t("admin.bookings.noBookings")}</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
 
       <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">

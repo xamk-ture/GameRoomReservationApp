@@ -1,11 +1,15 @@
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, TextField, TablePagination, Checkbox, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, TextField, TablePagination, Checkbox, FormControl, InputLabel, Select, MenuItem, Card, CardContent, useTheme, useMediaQuery, Divider, Chip, CircularProgress, Snackbar } from "@mui/material";
 import { OpenAPI } from "../../api/core/OpenAPI";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState, useMemo } from "react";
+import { api, RoomBookingDto, BookingStatus } from "../../api/api";
+import dayjs from "dayjs";
 
 type UserSortOrder = "alphabetical" | "newest" | "oldest" | "lastLogin";
 
 const AdminUsers = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [users, setUsers] = useState<Array<{ email: string; createdAt: string; lastLoginAt: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState("");
@@ -18,6 +22,11 @@ const AdminUsers = () => {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [snack, setSnack] = useState<string | null>(null);
+  const [userDetailsOpen, setUserDetailsOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ email: string; createdAt: string; lastLoginAt: string } | null>(null);
+  const [userBookings, setUserBookings] = useState<RoomBookingDto[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
 
   const { t, i18n } = useTranslation();
 
@@ -60,6 +69,77 @@ const AdminUsers = () => {
     const filterLower = userFilter.toLowerCase().trim();
     return sortedUsers.filter((user) => user.email.toLowerCase().includes(filterLower));
   }, [sortedUsers, userFilter]);
+
+  const formatEmailPrefix = (email?: string | null) => (email ? email.split("@")[0] : "");
+
+  const formatDateTime = (dateTime?: any) => {
+    if (!dateTime) return "";
+    try {
+      const d = dayjs(dateTime);
+      if (!d.isValid()) return "";
+      const isEnglish = i18n.language === "en";
+      return `${d.format("DD.MM.YYYY")} ${isEnglish ? d.format("h:mm A") : d.format("HH.mm")}`;
+    } catch { return ""; }
+  };
+
+  const handleOpenUserDetails = async (user: { email: string; createdAt: string; lastLoginAt: string }) => {
+    setSelectedUser(user);
+    setUserDetailsOpen(true);
+    setLoadingBookings(true);
+    setUserBookings([]);
+    
+    try {
+      // Get all bookings and filter by user email
+      const allBookings = await api.RoomBookingsService.getAllBookings();
+      const bookingsArray = Array.isArray(allBookings) ? allBookings : [];
+      const userBookingsFiltered = bookingsArray.filter((booking: RoomBookingDto) => {
+        const playerEmail = (booking as any).playerEmail || "";
+        return playerEmail.toLowerCase() === user.email.toLowerCase();
+      });
+      // Sort by date (newest first)
+      userBookingsFiltered.sort((a, b) => {
+        const dateA = dayjs(a.bookingDateTime as any);
+        const dateB = dayjs(b.bookingDateTime as any);
+        return dateB.isValid() && dateA.isValid() ? dateB.diff(dateA) : 0;
+      });
+      setUserBookings(userBookingsFiltered);
+    } catch (error) {
+      console.error("Error fetching user bookings:", error);
+      setUserBookings([]);
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+
+  const getStatusColor = (status?: BookingStatus) => {
+    switch (status) {
+      case BookingStatus.UPCOMING:
+        return "primary";
+      case BookingStatus.ONGOING:
+        return "success";
+      case BookingStatus.COMPLETED:
+        return "default";
+      case BookingStatus.CANCELLED:
+        return "error";
+      default:
+        return "default";
+    }
+  };
+
+  const getStatusLabel = (status?: BookingStatus) => {
+    switch (status) {
+      case BookingStatus.UPCOMING:
+        return t("bookings.status.upcoming");
+      case BookingStatus.ONGOING:
+        return t("bookings.status.ongoing");
+      case BookingStatus.COMPLETED:
+        return t("bookings.status.completed");
+      case BookingStatus.CANCELLED:
+        return t("bookings.status.cancelled");
+      default:
+        return status || "";
+    }
+  };
 
   return (
     <Box>
@@ -133,55 +213,101 @@ const AdminUsers = () => {
           </Button>
         </Box>
 
-        <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
-          <Table sx={{ minWidth: 650 }}>
-            <TableHead sx={{ bgcolor: "action.hover" }}>
-              <TableRow>
-                <TableCell width={40}>
-                  <Checkbox
-                    checked={filteredUsers.length > 0 && selectedEmails.length === filteredUsers.length}
-                    indeterminate={selectedEmails.length > 0 && selectedEmails.length < filteredUsers.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedEmails(filteredUsers.map((u) => u.email));
-                      } else {
-                        setSelectedEmails([]);
-                      }
-                    }}
-                  />
-                </TableCell>
-                <TableCell><strong>{t("common.email")}</strong></TableCell>
-                <TableCell><strong>{t("common.created")}</strong></TableCell>
-                <TableCell><strong>{t("admin.users.lastLogin")}</strong></TableCell>
-                <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredUsers
-                .slice(userPage * rowsPerPage, userPage * rowsPerPage + rowsPerPage)
-                .map((u) => (
-                  <TableRow key={u.email} hover>
-                    <TableCell>
-                      <Checkbox checked={selectedEmails.includes(u.email)} onChange={(e) => setSelectedEmails((prev) => e.target.checked ? [...prev, u.email] : prev.filter(x => x !== u.email))} />
-                    </TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>{new Date(u.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}</TableCell>
-                    <TableCell>{new Date(u.lastLoginAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}</TableCell>
-                    <TableCell align="right">
-                      <Button color="error" size="small" onClick={() => { setSelectedEmails([u.email]); setConfirmOpen(true); }}>{t("common.delete")}</Button>
+        {isMobile ? (
+          // Mobile card view
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {filteredUsers
+              .slice(userPage * rowsPerPage, userPage * rowsPerPage + rowsPerPage)
+              .map((u) => (
+                <Card key={u.email} sx={{ border: 1, borderColor: "divider" }}>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 2 }}>
+                      <Checkbox 
+                        checked={selectedEmails.includes(u.email)} 
+                        onChange={(e) => setSelectedEmails((prev) => e.target.checked ? [...prev, u.email] : prev.filter(x => x !== u.email))} 
+                        sx={{ mt: -1, ml: -1 }}
+                      />
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                          {u.email}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          <strong>{t("common.created")}:</strong> {new Date(u.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          <strong>{t("admin.users.lastLogin")}:</strong> {new Date(u.lastLoginAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}
+                        </Typography>
+                        <Button 
+                          size="small" 
+                          variant="outlined"
+                          onClick={() => handleOpenUserDetails(u)}
+                          sx={{ mt: 1 }}
+                        >
+                          {t("common.viewDetails")}
+                        </Button>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            {users.length === 0 && (
+              <Box sx={{ py: 3, textAlign: "center" }}>
+                <Typography color="text.secondary">{t("admin.users.noUsers")}</Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          // Desktop table view
+          <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead sx={{ bgcolor: "action.hover" }}>
+                <TableRow>
+                  <TableCell width={40}>
+                    <Checkbox
+                      checked={filteredUsers.length > 0 && selectedEmails.length === filteredUsers.length}
+                      indeterminate={selectedEmails.length > 0 && selectedEmails.length < filteredUsers.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedEmails(filteredUsers.map((u) => u.email));
+                        } else {
+                          setSelectedEmails([]);
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell><strong>{t("common.email")}</strong></TableCell>
+                  <TableCell><strong>{t("common.created")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.users.lastLogin")}</strong></TableCell>
+                  <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredUsers
+                  .slice(userPage * rowsPerPage, userPage * rowsPerPage + rowsPerPage)
+                  .map((u) => (
+                    <TableRow key={u.email} hover>
+                      <TableCell>
+                        <Checkbox checked={selectedEmails.includes(u.email)} onChange={(e) => setSelectedEmails((prev) => e.target.checked ? [...prev, u.email] : prev.filter(x => x !== u.email))} />
+                      </TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{new Date(u.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}</TableCell>
+                      <TableCell>{new Date(u.lastLoginAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}</TableCell>
+                      <TableCell align="right">
+                        <Button size="small" variant="outlined" onClick={() => handleOpenUserDetails(u)}>{t("common.viewDetails")}</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {users.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary">{t("admin.users.noUsers")}</Typography>
                     </TableCell>
                   </TableRow>
-                ))}
-              {users.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                    <Typography color="text.secondary">{t("admin.users.noUsers")}</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
         <TablePagination
           component="div"
           count={filteredUsers.length}
@@ -220,11 +346,13 @@ const AdminUsers = () => {
               const resp = await fetch(`${base}/api/admin/users`, { method: "DELETE", headers, body: JSON.stringify({ emails: selectedEmails }) });
               if (!resp.ok) throw await resp.json().catch(() => new Error(t("errors.deleteFailed")));
               setConfirmOpen(false);
+              const deletedCount = selectedEmails.length;
               setSelectedEmails([]);
               // reload users list
               const u = await fetch(`${base}/api/admin/users`, { headers: headers });
               const usersJson = await u.json();
               setUsers(usersJson || []);
+              setSnack(t("admin.users.usersDeleted", { count: deletedCount }));
             } catch (e: any) {
               setError(e?.Message || e?.message || t("errors.deleteFailed"));
             }
@@ -313,6 +441,122 @@ const AdminUsers = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* User Details Dialog */}
+      <Dialog open={userDetailsOpen} onClose={() => { setUserDetailsOpen(false); setSelectedUser(null); }} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {selectedUser && (
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                {formatEmailPrefix(selectedUser.email)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedUser.email}
+              </Typography>
+            </Box>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          {selectedUser && (
+            <Box>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  {t("common.email")}
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedUser.email}
+                </Typography>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  {t("common.created")}
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {new Date(selectedUser.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}
+                </Typography>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  {t("admin.users.lastLogin")}
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {new Date(selectedUser.lastLoginAt).toLocaleString(i18n.language === "en" ? "en-US" : "fi-FI")}
+                </Typography>
+              </Box>
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                {t("admin.users.bookings")} ({userBookings.length})
+              </Typography>
+              {loadingBookings ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : userBookings.length === 0 ? (
+                <Typography color="text.secondary" sx={{ py: 2 }}>
+                  {t("admin.users.noBookings")}
+                </Typography>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  {userBookings.map((booking) => {
+                    const isCancelled = booking.status === BookingStatus.CANCELLED;
+                    return (
+                      <Card key={booking.id} sx={{ border: 1, borderColor: "divider", opacity: isCancelled ? 0.6 : 1 }}>
+                        <CardContent>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              {formatDateTime(booking.bookingDateTime)}
+                            </Typography>
+                            <Chip
+                              label={getStatusLabel(booking.status)}
+                              color={getStatusColor(booking.status) as any}
+                              size="small"
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            <strong>{t("admin.bookings.end")}:</strong> {dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').format("DD.MM.YYYY HH.mm")}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            <strong>{t("admin.bookings.durationHours")}:</strong> {booking.duration || 0}
+                          </Typography>
+                          {booking.devices && booking.devices.length > 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>{t("admin.bookings.devices")}:</strong> {booking.devices.map(d => d.name).join(", ")}
+                            </Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: "space-between" }}>
+          {selectedUser && (
+            <Button 
+              color="error" 
+              variant="contained"
+              onClick={() => {
+                setUserDetailsOpen(false);
+                setSelectedEmails([selectedUser.email]);
+                setConfirmOpen(true);
+                setSelectedUser(null);
+              }}
+            >
+              {t("admin.users.deleteUser")}
+            </Button>
+          )}
+          <Box sx={{ flexGrow: 1 }} />
+          <Button onClick={() => { setUserDetailsOpen(false); setSelectedUser(null); }}>
+            {t("common.close")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!snack}
+        message={snack || ""}
+        autoHideDuration={3000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      />
     </Box>
   );
 };

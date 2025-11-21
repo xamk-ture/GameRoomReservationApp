@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, DeviceDto } from "../../api/api";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Card, CardContent, useTheme, useMediaQuery, Chip } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
 const AdminDevices = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [devices, setDevices] = useState<DeviceDto[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [open, setOpen] = useState(false);
@@ -139,76 +141,134 @@ const AdminDevices = () => {
           </Button>
         </Box>
 
-        <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
-          <Table sx={{ minWidth: 650 }}>
-            <TableHead sx={{ bgcolor: "action.hover" }}>
-              <TableRow>
-                <TableCell width={40}>
-                  <Checkbox
-                    checked={devices.length > 0 && selected.length === devices.length}
-                    indeterminate={selected.length > 0 && selected.length < devices.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelected(devices.map(d => d.id!));
-                      } else {
-                        setSelected([]);
-                      }
-                    }}
-                  />
-                </TableCell>
-                <TableCell><strong>{t("admin.devices.name")}</strong></TableCell>
-                <TableCell><strong>{t("admin.devices.description")}</strong></TableCell>
-                <TableCell><strong>{t("admin.devices.quantity")}</strong></TableCell>
-                <TableCell><strong>{t("admin.devices.status")}</strong></TableCell>
-                <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {devices.map((d) => {
-                const isAvailable = (d.status as any) === "Available";
-                return (
-                  <TableRow key={d.id} hover>
-                    <TableCell>
-                      <Checkbox checked={selected.includes(d.id!)} onChange={(e) => {
-                        setSelected((prev) => e.target.checked ? [...prev, d.id!] : prev.filter(x => x !== d.id));
-                      }} />
-                    </TableCell>
-                    <TableCell>{d.name}</TableCell>
-                    <TableCell>{d.description || ""}</TableCell>
-                    <TableCell>{d.quantity ?? 0}</TableCell>
-                    <TableCell>
-                      <Box
-                        component="span"
-                        sx={{
-                          px: 1,
-                          py: 0.5,
-                          borderRadius: 1,
-                          bgcolor: isAvailable ? "success.light" : "error.light",
-                          color: isAvailable ? "success.contrastText" : "error.contrastText",
-                          fontSize: "0.875rem",
-                          fontWeight: "medium"
+        {isMobile ? (
+          // Mobile card view
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {devices.map((d) => {
+              const isAvailable = (d.status as any) === "Available";
+              return (
+                <Card key={d.id} sx={{ border: 1, borderColor: "divider" }}>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 2 }}>
+                      <Checkbox 
+                        checked={selected.includes(d.id!)} 
+                        onChange={(e) => {
+                          setSelected((prev) => e.target.checked ? [...prev, d.id!] : prev.filter(x => x !== d.id));
                         }}
-                      >
-                        {isAvailable ? t("admin.devices.statusAvailable") : t("admin.devices.statusUnavailable")}
+                        sx={{ mt: -1, ml: -1 }}
+                      />
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexWrap: "wrap" }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            {d.name}
+                          </Typography>
+                          <Chip
+                            label={isAvailable ? t("admin.devices.statusAvailable") : t("admin.devices.statusUnavailable")}
+                            color={isAvailable ? "success" : "error"}
+                            size="small"
+                          />
+                        </Box>
+                        {d.description && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {d.description}
+                          </Typography>
+                        )}
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          <strong>{t("admin.devices.quantity")}:</strong> {d.quantity ?? 0}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          <Button size="small" variant="outlined" onClick={() => openEdit(d)}>
+                            {t("common.edit")}
+                          </Button>
+                          <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d)}>
+                            {t("common.delete")}
+                          </Button>
+                        </Box>
                       </Box>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
-                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d)}>{t("common.delete")}</Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {devices.length === 0 && (
+              <Box sx={{ py: 3, textAlign: "center" }}>
+                <Typography color="text.secondary">{t("admin.devices.noDevices")}</Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          // Desktop table view
+          <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead sx={{ bgcolor: "action.hover" }}>
+                <TableRow>
+                  <TableCell width={40}>
+                    <Checkbox
+                      checked={devices.length > 0 && selected.length === devices.length}
+                      indeterminate={selected.length > 0 && selected.length < devices.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelected(devices.map(d => d.id!));
+                        } else {
+                          setSelected([]);
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell><strong>{t("admin.devices.name")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.devices.description")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.devices.quantity")}</strong></TableCell>
+                  <TableCell><strong>{t("admin.devices.status")}</strong></TableCell>
+                  <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {devices.map((d) => {
+                  const isAvailable = (d.status as any) === "Available";
+                  return (
+                    <TableRow key={d.id} hover>
+                      <TableCell>
+                        <Checkbox checked={selected.includes(d.id!)} onChange={(e) => {
+                          setSelected((prev) => e.target.checked ? [...prev, d.id!] : prev.filter(x => x !== d.id));
+                        }} />
+                      </TableCell>
+                      <TableCell>{d.name}</TableCell>
+                      <TableCell>{d.description || ""}</TableCell>
+                      <TableCell>{d.quantity ?? 0}</TableCell>
+                      <TableCell>
+                        <Box
+                          component="span"
+                          sx={{
+                            px: 1,
+                            py: 0.5,
+                            borderRadius: 1,
+                            bgcolor: isAvailable ? "success.light" : "error.light",
+                            color: isAvailable ? "success.contrastText" : "error.contrastText",
+                            fontSize: "0.875rem",
+                            fontWeight: "medium"
+                          }}
+                        >
+                          {isAvailable ? t("admin.devices.statusAvailable") : t("admin.devices.statusUnavailable")}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
+                        <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d)}>{t("common.delete")}</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {devices.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary">{t("admin.devices.noDevices")}</Typography>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-              {devices.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                    <Typography color="text.secondary">{t("admin.devices.noDevices")}</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
 
       <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
