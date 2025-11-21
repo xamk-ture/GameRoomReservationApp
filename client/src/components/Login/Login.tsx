@@ -10,7 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { OpenAPI } from "../../api/core/OpenAPI";
 import { PlayerDto } from "../../api/api";
-import loginBackground from "../../assets/login-background.jpg";
+import loginBackground from "../../assets/login-Background.jpg";
 import { enqueueSnackbar } from "notistack";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthProvider";
