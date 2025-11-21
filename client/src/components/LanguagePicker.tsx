@@ -21,15 +21,16 @@ import locales from "../i18n/locales";
 const LanguagePicker = () => {
   const { t, i18n } = useTranslation();
 
-  // Use localStorage to pick the default language or fallback to Finnish ("fi")
-  const defaultLangCode = localStorage.getItem("lang") || "fi";
-
-  // Force the language to the default if not already set
+  // Initialize language from localStorage or use current i18n language
   useEffect(() => {
-    if (i18n.language !== defaultLangCode) {
-      i18n.changeLanguage(defaultLangCode);
+    const savedLang = localStorage.getItem("lang");
+    if (savedLang && i18n.language !== savedLang) {
+      i18n.changeLanguage(savedLang);
+    } else if (!savedLang && !i18n.language) {
+      // Only set default if no language is set at all
+      i18n.changeLanguage("fi");
     }
-  }, [defaultLangCode, i18n]);
+  }, [i18n]);
 
   // Convert your locales object to an array of language options.
   const languageOptions = Object.keys(locales)

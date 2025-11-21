@@ -6,6 +6,7 @@ import AppTitle from "../../assets/APP-TITLE.svg";
 import { usePlayerInfo } from "../../hooks/usePlayerInfo";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../../context/AuthProvider";
 
 interface NavigationProps {
   isAdminMenu?: boolean;
@@ -15,12 +16,19 @@ interface NavigationProps {
 
 const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: NavigationProps) => {
   const { error } = usePlayerInfo();
+  const { isAdmin } = useAuth();
   const location = useLocation();
   const { t } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [focusedButton, setFocusedButton] = useState(location.pathname);
+
+  const displayButtons = isAdminMenu
+    ? adminNavButtons
+    : (isAdmin
+      ? [{ translationKey: "nav.dashboard", path: "/admin/dashboard" }, ...navButtons]
+      : navButtons);
 
   const navContent = (
     <Box sx={styles.container}>
@@ -29,7 +37,7 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
       </Box>
       {error && <Typography sx={styles.error}>{t("errors.loadError")}: {error}</Typography>}
       <Box sx={styles.navButtons}>
-        {(isAdminMenu ? adminNavButtons : navButtons).map((button) => (
+        {displayButtons.map((button) => (
           <Button
             key={button.translationKey}
             variant="outlined"
@@ -60,7 +68,7 @@ const Navigation = ({ isAdminMenu = false, mobileOpen = false, onMobileClose }: 
           </IconButton>
         </Link>
       </Box>
-    </Box>
+    </Box >
   );
 
   if (isMobile) {

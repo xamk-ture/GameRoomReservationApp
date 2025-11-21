@@ -62,7 +62,7 @@ const AdminDevices = () => {
         name: form.name,
         description: form.description,
         quantity: form.quantity,
-        status: (form.available ? "Available" : "Unavailable") as any,
+        status: (form.available ? "Available" : "Maintenance") as any,
       });
       setSnack(t("admin.devices.deviceUpdated"));
     } else {
@@ -70,7 +70,7 @@ const AdminDevices = () => {
         name: form.name,
         description: form.description,
         quantity: form.quantity,
-        status: (form.available ? "Available" : "Unavailable") as any,
+        status: (form.available ? "Available" : "Maintenance") as any,
       });
       setSnack(t("admin.devices.deviceCreated"));
     }
@@ -80,42 +80,91 @@ const AdminDevices = () => {
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ mb: 2 }}>{t("admin.devices.manageTitle")}</Typography>
-      <Button variant="contained" sx={{ mb: 2, mr: 1 }} onClick={openCreate}>{t("admin.devices.add")}</Button>
-      <Button variant="outlined" color="error" sx={{ mb: 2 }} disabled={selected.length === 0} onClick={handleBulkDelete}>{t("common.deleteSelected")}</Button>
-      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-        <Table sx={{ minWidth: 650 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell width={24} />
-              <TableCell>{t("admin.devices.name")}</TableCell>
-              <TableCell>{t("admin.devices.description")}</TableCell>
-              <TableCell>{t("admin.devices.quantity")}</TableCell>
-              <TableCell>{t("admin.devices.status")}</TableCell>
-              <TableCell align="right">{t("common.actions")}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {devices.map((d) => (
-              <TableRow key={d.id}>
-                <TableCell>
-                  <Checkbox checked={selected.includes(d.id!)} onChange={(e) => {
-                    setSelected((prev) => e.target.checked ? [...prev, d.id!] : prev.filter(x => x !== d.id));
-                  }} />
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold">{t("admin.devices.manageTitle")}</Typography>
+      </Box>
+
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+          <Button variant="contained" onClick={openCreate} startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}>
+            {t("admin.devices.add")}
+          </Button>
+          <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>
+            {t("common.deleteSelected")} ({selected.length})
+          </Button>
+        </Box>
+
+        <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+          <Table sx={{ minWidth: 650 }}>
+            <TableHead sx={{ bgcolor: "action.hover" }}>
+              <TableRow>
+                <TableCell width={40}>
+                  <Checkbox
+                    checked={devices.length > 0 && selected.length === devices.length}
+                    indeterminate={selected.length > 0 && selected.length < devices.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelected(devices.map(d => d.id!));
+                      } else {
+                        setSelected([]);
+                      }
+                    }}
+                  />
                 </TableCell>
-                <TableCell>{d.name}</TableCell>
-                <TableCell>{d.description || ""}</TableCell>
-                <TableCell>{d.quantity ?? 0}</TableCell>
-                <TableCell>{(d.status as any) === "Available" ? t("admin.devices.statusAvailable") : t("admin.devices.statusUnavailable")}</TableCell>
-                <TableCell align="right">
-                  <Button sx={{ mr: 1 }} variant="text" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
-                  <Button color="error" variant="outlined" onClick={() => handleDelete(d.id!)}>{t("common.delete")}</Button>
-                </TableCell>
+                <TableCell><strong>{t("admin.devices.name")}</strong></TableCell>
+                <TableCell><strong>{t("admin.devices.description")}</strong></TableCell>
+                <TableCell><strong>{t("admin.devices.quantity")}</strong></TableCell>
+                <TableCell><strong>{t("admin.devices.status")}</strong></TableCell>
+                <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {devices.map((d) => {
+                const isAvailable = (d.status as any) === "Available";
+                return (
+                  <TableRow key={d.id} hover>
+                    <TableCell>
+                      <Checkbox checked={selected.includes(d.id!)} onChange={(e) => {
+                        setSelected((prev) => e.target.checked ? [...prev, d.id!] : prev.filter(x => x !== d.id));
+                      }} />
+                    </TableCell>
+                    <TableCell>{d.name}</TableCell>
+                    <TableCell>{d.description || ""}</TableCell>
+                    <TableCell>{d.quantity ?? 0}</TableCell>
+                    <TableCell>
+                      <Box
+                        component="span"
+                        sx={{
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: isAvailable ? "success.light" : "error.light",
+                          color: isAvailable ? "success.contrastText" : "error.contrastText",
+                          fontSize: "0.875rem",
+                          fontWeight: "medium"
+                        }}
+                      >
+                        {isAvailable ? t("admin.devices.statusAvailable") : t("admin.devices.statusUnavailable")}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
+                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d.id!)}>{t("common.delete")}</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {devices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                    <Typography color="text.secondary">{t("admin.devices.noDevices")}</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
         <DialogTitle>{editing ? t("admin.devices.edit") : t("admin.devices.add")}</DialogTitle>
@@ -131,10 +180,10 @@ const AdminDevices = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar 
-        open={!!snack} 
-        message={snack || ""} 
-        autoHideDuration={2000} 
+      <Snackbar
+        open={!!snack}
+        message={snack || ""}
+        autoHideDuration={2000}
         onClose={() => setSnack(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       />

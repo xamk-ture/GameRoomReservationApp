@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { api, DeviceDto, RoomBookingDto, PlayerDto, BookingStatus } from "../../api/api";
 import { useTranslation } from "react-i18next";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Checkbox, Paper, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, Select, MenuItem, FormControl, InputLabel, Alert } from "@mui/material";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 
@@ -45,7 +45,7 @@ const AdminBookings = () => {
   // Calculate device availability based on bookings
   const availabilityMap = useMemo(() => {
     const map = new Map<number, DeviceAvailability>();
-    
+
     if (!open || !form.bookingDateTime || !form.duration) {
       return map;
     }
@@ -72,20 +72,20 @@ const AdminBookings = () => {
       if (!device.id) return;
 
       const totalQuantity = device.quantity ?? 0;
-      
+
       // Count how many of this device are booked during the requested time
       let bookedCount = 0;
       activeBookings.forEach(booking => {
         if (!booking.bookingDateTime) return;
-        
+
         // Normalize booking time - server returns ISO strings
         const bookingStart = dayjs(booking.bookingDateTime);
         const bookingEnd = bookingStart.add(booking.duration ?? 0, 'hour');
-        
+
         // Check if booking overlaps with requested time
         // Overlap: bookingStart < endTime AND bookingEnd > startTime
         const overlaps = bookingStart.isBefore(endTime) && bookingEnd.isAfter(startTime);
-        
+
         if (overlaps && booking.devices) {
           // Check if this booking uses the device
           const usesDevice = booking.devices.some(d => d.id === device.id);
@@ -116,7 +116,7 @@ const AdminBookings = () => {
 
         // Find the earliest end time (when device becomes available)
         if (overlappingBookings.length > 0) {
-          const earliestEnd = overlappingBookings.reduce((earliest, current) => 
+          const earliestEnd = overlappingBookings.reduce((earliest, current) =>
             current.isBefore(earliest) ? current : earliest
           );
           nextAvailableTime = earliestEnd.toISOString();
@@ -154,17 +154,17 @@ const AdminBookings = () => {
     setSnack(t("admin.bookings.deletedSelected"));
   };
 
-  const openCreate = () => { 
-    setEditing(null); 
-    setForm({ 
-      bookingDateTime: "", 
-      duration: 1, 
-      isPlayingAlone: true, 
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      bookingDateTime: "",
+      duration: 1,
+      isPlayingAlone: true,
       fellows: 0,
       deviceId: undefined,
       playerId: undefined
-    }); 
-    setOpen(true); 
+    });
+    setOpen(true);
   };
   const openEdit = (booking: RoomBookingDto) => {
     setEditing(booking);
@@ -235,12 +235,12 @@ const AdminBookings = () => {
             playerId: form.playerId,
           }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ Message: `HTTP ${response.status}: ${response.statusText}` }));
           throw new Error(errorData.Message || errorData.message || t("errors.badRequest"));
         }
-        
+
         setSnack(t("admin.bookings.bookingCreated"));
       }
     } catch (e: any) {
@@ -339,72 +339,111 @@ const AdminBookings = () => {
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ mb: 2 }}>{t("admin.bookings.manageTitle")}</Typography>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
-        <Button variant="contained" onClick={openCreate}>{t("admin.bookings.add")}</Button>
-        <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>{t("common.deleteSelected")}</Button>
-        <Button variant="outlined" onClick={load}>{t("admin.bookings.update")}</Button>
-        <TextField
-          size="small"
-          label={t("admin.bookings.searchByPlayer")}
-          value={playerFilter}
-          onChange={(e) => setPlayerFilter(e.target.value)}
-          sx={{ minWidth: 200 }}
-          placeholder={t("admin.bookings.playerEmailPrefix")}
-        />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>{t("admin.bookings.sortBy")}</InputLabel>
-          <Select
-            value={sortOrder}
-            label={t("admin.bookings.sortBy")}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-          >
-            <MenuItem value="newest">{t("admin.bookings.newestFirst")}</MenuItem>
-            <MenuItem value="oldest">{t("admin.bookings.oldestFirst")}</MenuItem>
-            <MenuItem value="next">{t("admin.bookings.upcomingFirst")}</MenuItem>
-            <MenuItem value="previous">{t("admin.bookings.oldestPastFirst")}</MenuItem>
-          </Select>
-        </FormControl>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold">{t("admin.bookings.manageTitle")}</Typography>
       </Box>
-      {errorMsg && <Typography color="error" sx={{ mb: 1 }}>{errorMsg}</Typography>}
-      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-        <Table sx={{ minWidth: 650 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell width={24}>
-                <input
-                  type="checkbox"
-                  checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
-                  onChange={handleSelectAll}
-                  title={selected.length === filteredBookings.length && filteredBookings.length > 0 ? t("admin.bookings.deselectAll") : t("admin.bookings.selectAll")}
-                />
-              </TableCell>
-              <TableCell>{t("common.id")}</TableCell>
-              <TableCell>{t("admin.bookings.player")}</TableCell>
-              <TableCell>{t("admin.bookings.start")}</TableCell>
-              <TableCell>{t("admin.bookings.end")}</TableCell>
-              <TableCell align="right">{t("common.actions")}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredBookings.map((booking: RoomBookingDto) => (
-              <TableRow key={booking.id}>
-                <TableCell>
-                  <input type="checkbox" checked={selected.includes(booking.id!)} onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))} />
+
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <Button variant="contained" onClick={openCreate} startIcon={<span style={{ fontSize: "1.2em" }}>+</span>}>
+            {t("admin.bookings.add")}
+          </Button>
+          <Button variant="outlined" onClick={load}>
+            {t("admin.bookings.update")}
+          </Button>
+          <Box sx={{ flexGrow: 1 }} />
+          <TextField
+            size="small"
+            label={t("admin.bookings.searchByPlayer")}
+            value={playerFilter}
+            onChange={(e) => setPlayerFilter(e.target.value)}
+            sx={{ minWidth: 200 }}
+            placeholder={t("admin.bookings.playerEmailPrefix")}
+          />
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>{t("admin.bookings.sortBy")}</InputLabel>
+            <Select
+              value={sortOrder}
+              label={t("admin.bookings.sortBy")}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+            >
+              <MenuItem value="newest">{t("admin.bookings.newestFirst")}</MenuItem>
+              <MenuItem value="oldest">{t("admin.bookings.oldestFirst")}</MenuItem>
+              <MenuItem value="next">{t("admin.bookings.upcomingFirst")}</MenuItem>
+              <MenuItem value="previous">{t("admin.bookings.oldestPastFirst")}</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="outlined" color="error" disabled={selected.length === 0} onClick={handleBulkDelete}>
+            {t("common.deleteSelected")} ({selected.length})
+          </Button>
+        </Box>
+
+        {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
+
+        <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+          <Table sx={{ minWidth: 650 }}>
+            <TableHead sx={{ bgcolor: "action.hover" }}>
+              <TableRow>
+                <TableCell width={40}>
+                  <input
+                    type="checkbox"
+                    checked={filteredBookings.length > 0 && selected.length === filteredBookings.length && filteredBookings.every((booking: RoomBookingDto) => selected.includes(booking.id!))}
+                    onChange={handleSelectAll}
+                    title={selected.length === filteredBookings.length && filteredBookings.length > 0 ? t("admin.bookings.deselectAll") : t("admin.bookings.selectAll")}
+                    style={{ width: 18, height: 18, cursor: "pointer" }}
+                  />
                 </TableCell>
-                <TableCell>{booking.id}</TableCell>
-                <TableCell>{formatEmailPrefix((booking as any).playerEmail)}</TableCell>
-                <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
-                <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
-                <TableCell align="right">
-                  <Button sx={{ mr: 1 }} variant="text" onClick={() => openEdit(booking)}>{t("common.edit")}</Button>
-                  <Button color="error" variant="outlined" onClick={() => handleDelete(booking.id!)}>{t("common.delete")}</Button>
-                </TableCell>
+                <TableCell><strong>{t("common.id")}</strong></TableCell>
+                <TableCell><strong>{t("admin.bookings.player")}</strong></TableCell>
+                <TableCell><strong>{t("admin.bookings.start")}</strong></TableCell>
+                <TableCell><strong>{t("admin.bookings.end")}</strong></TableCell>
+                <TableCell><strong>{t("admin.bookings.devices")}</strong></TableCell>
+                <TableCell align="right"><strong>{t("common.actions")}</strong></TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {filteredBookings.map((booking: RoomBookingDto) => {
+                const isPast = dayjs(booking.bookingDateTime as any).add(booking.duration || 0, 'hour').isBefore(dayjs());
+                const isCancelled = booking.status === BookingStatus.CANCELLED;
+
+                return (
+                  <TableRow key={booking.id} hover sx={{ opacity: isCancelled ? 0.6 : 1, bgcolor: isPast ? "action.hover" : "inherit" }}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(booking.id!)}
+                        onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, booking.id!] : prev.filter(selectedId => selectedId !== booking.id))}
+                        style={{ width: 18, height: 18, cursor: "pointer" }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {booking.id}
+                      {isCancelled && <Box component="span" sx={{ ml: 1, px: 0.5, py: 0, bgcolor: "error.light", color: "error.contrastText", borderRadius: 0.5, fontSize: "0.7rem" }}>CANCELLED</Box>}
+                    </TableCell>
+                    <TableCell>{formatEmailPrefix((booking as any).playerEmail)}</TableCell>
+                    <TableCell>{formatDateTime(booking.bookingDateTime)}</TableCell>
+                    <TableCell>{endFrom(booking.bookingDateTime as any, booking.duration)}</TableCell>
+                    <TableCell>
+                      {(booking.devices || []).map(d => d.name).join(", ") || "-"}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(booking)}>{t("common.edit")}</Button>
+                      <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(booking.id!)}>{t("common.delete")}</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {filteredBookings.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                    <Typography color="text.secondary">{t("admin.bookings.noBookings")}</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
         <DialogTitle>{editing ? t("admin.bookings.edit") : t("admin.bookings.add")}</DialogTitle>
@@ -455,18 +494,18 @@ const AdminBookings = () => {
                 // OR if we're still fetching (show loading)
                 const hasValidDateTime = form.bookingDateTime && form.duration;
                 const showAvailability = hasValidDateTime && availability !== undefined;
-                
+
                 return (
                   <MenuItem key={device.id} value={device.id} title={device.description || ""} disabled={fullyBooked}>
                     <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span>{device.name || `#${device.id}`}</span>
                         {showAvailability && (
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
+                          <Typography
+                            variant="caption"
+                            sx={{
                               ml: 1,
-                              color: availability 
+                              color: availability
                                 ? (fullyBooked ? "error.main" : availability.availableQuantity > 0 ? "success.main" : "warning.main")
                                 : "text.secondary",
                               fontWeight: "medium"
@@ -474,10 +513,10 @@ const AdminBookings = () => {
                           >
                             {availability
                               ? (fullyBooked && availability.nextAvailableTime
-                                ? t("bookings.deviceNextAvailable", { 
-                                    time: dayjs(availability.nextAvailableTime).format(i18n.language === "en" ? "h:mm A" : "HH.mm"),
-                                    date: dayjs(availability.nextAvailableTime).format("DD.MM.YYYY")
-                                  })
+                                ? t("bookings.deviceNextAvailable", {
+                                  time: dayjs(availability.nextAvailableTime).format(i18n.language === "en" ? "h:mm A" : "HH.mm"),
+                                  date: dayjs(availability.nextAvailableTime).format("DD.MM.YYYY")
+                                })
                                 : t("bookings.deviceAvailable", { available: availability.availableQuantity, total: availability.totalQuantity }))
                               : `${device.quantity ?? 0}/${device.quantity ?? 0}`}
                           </Typography>
@@ -501,10 +540,10 @@ const AdminBookings = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar 
-        open={!!snack} 
-        message={snack || ""} 
-        autoHideDuration={2000} 
+      <Snackbar
+        open={!!snack}
+        message={snack || ""}
+        autoHideDuration={2000}
         onClose={() => setSnack(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />

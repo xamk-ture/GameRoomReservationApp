@@ -62,6 +62,30 @@ namespace gameroombookingsys.Controllers
 
         public class DeleteUsersRequest { public List<string> Emails { get; set; } = new(); }
 
+        public class CreateUserRequest { public string Email { get; set; } = string.Empty; }
+
+        [HttpPost("users")]
+        [SwaggerOperation(OperationId = "Admin_CreateUser")]
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Email))
+                return BadRequest(new { Message = "Email is required." });
+
+            var email = request.Email.Trim();
+            
+            // Validate email format
+            if (!email.Contains("@") || (!email.EndsWith("@edu.xamk.fi", StringComparison.OrdinalIgnoreCase) && !email.EndsWith("@xamk.fi", StringComparison.OrdinalIgnoreCase)))
+                return BadRequest(new { Message = "Invalid email. Only Xamk emails (@edu.xamk.fi or @xamk.fi) are allowed." });
+
+            // Check if user already exists
+            var existing = await _users.GetUserByEmail(email);
+            if (existing != null)
+                return Conflict(new { Message = "User with this email already exists." });
+
+            var user = await _users.UpsertUser(email);
+            return Ok(user);
+        }
+
         [HttpDelete("users")]
         [SwaggerOperation(OperationId = "Admin_DeleteUsers")]
         public async Task<IActionResult> DeleteUsers([FromBody] DeleteUsersRequest request)

@@ -1,0 +1,8 @@
+{
+ "admin.users.confirmDeleteBody": "Haluatko varmasti poistaa pysyvästi {{count}} käyttäjän? Tätä ei voi perua.",
+ "admin.users.noUsers": "Käyttäjiä ei löytynyt",
+ "admin.devices.statusUnavailable": "Ei saatavilla",
+ "admin.devices.noDevices": "Laitteita ei löytynyt",
+ "admin.bookings.deselectAll": "Poista valinta kaikista",
+ "admin.bookings.noBookings": "Varauksia ei löytynyt"
+}
