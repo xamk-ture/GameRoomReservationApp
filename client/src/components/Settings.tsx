@@ -1,5 +1,4 @@
 import { Box, Typography } from "@mui/material";
-import LanguagePicker from "./LanguagePicker";
 import { useTranslation } from "react-i18next";
 
 const Settings = () => {
@@ -7,7 +6,9 @@ const Settings = () => {
   return (
     <Box sx={styles.container}>
       <Typography sx={styles.title}>{t("Settings")}</Typography>
-      <LanguagePicker />
+      <Typography variant="body1" color="text.secondary">
+        {t("settings.description", "Settings page")}
+      </Typography>
     </Box>
   );
 };

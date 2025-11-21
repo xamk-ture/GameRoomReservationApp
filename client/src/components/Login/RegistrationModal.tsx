@@ -16,20 +16,24 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [errorParams, setErrorParams] = useState<Record<string, any> | null>(null);
 
   const handleSend = async () => {
     if (!email.endsWith("@edu.xamk.fi")) {
-      setError(t("errors.invalidUniversityEmail"));
+      setErrorKey("errors.invalidUniversityEmail");
+      setErrorParams(null);
       return;
     }
     try {
       await onSend(email);
       setEmail("");
-      setError("");
+      setErrorKey(null);
+      setErrorParams(null);
       onClose();
     } catch (e: any) {
-      setError(t("errors.registrationEmailFailed", { error: e.message || e }));
+      setErrorKey("errors.registrationEmailFailed");
+      setErrorParams({ error: e.message || e });
     }
   };
 
@@ -62,9 +66,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
             fullWidth
             margin="normal"
           />
-          {error && (
+          {errorKey && (
             <Typography color="error" variant="body2">
-              {error}
+              {errorParams ? t(errorKey, errorParams) : t(errorKey)}
             </Typography>
           )}
         </Box>

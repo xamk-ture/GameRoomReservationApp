@@ -3,6 +3,7 @@ import Navigation from "../SideNav/Navigation";
 import { Box, IconButton, AppBar, Toolbar, useTheme, useMediaQuery } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LoaderBackdrop from "../LoaderBackDrop";
+import LanguagePicker from "../LanguagePicker";
 import { useState } from "react";
 
 const Root = () => {
@@ -18,7 +19,7 @@ const Root = () => {
     <Box sx={styles.container}>
       {isMobile && (
         <AppBar position="fixed" sx={styles.appBar}>
-          <Toolbar>
+          <Toolbar sx={styles.toolbar}>
             <IconButton
               color="inherit"
               aria-label="open drawer"
@@ -28,6 +29,9 @@ const Root = () => {
             >
               <MenuIcon />
             </IconButton>
+            <Box sx={styles.topBarMobile}>
+              <LanguagePicker />
+            </Box>
           </Toolbar>
         </AppBar>
       )}
@@ -35,6 +39,11 @@ const Root = () => {
       <LoaderBackdrop />
       <Box sx={styles.outletComponents}>
         {isMobile && <Box sx={styles.toolbarSpacer} />}
+        {!isMobile && (
+          <Box sx={styles.topBar}>
+            <LanguagePicker />
+          </Box>
+        )}
         <Outlet />
       </Box>
     </Box>
@@ -53,6 +62,11 @@ const styles = {
     backgroundColor: "#F3A93A",
     color: "#000",
   },
+  toolbar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   menuButton: {
     marginRight: 2,
   },
@@ -64,5 +78,14 @@ const styles = {
     padding: { xs: 2, md: 3 },
     width: { xs: "100%", md: "80%" },
     overflow: "auto",
+  },
+  topBar: {
+    display: { xs: "none", md: "flex" },
+    justifyContent: "flex-end",
+    mb: 2,
+  },
+  topBarMobile: {
+    display: { xs: "flex", md: "none" },
+    justifyContent: "flex-end",
   },
 };

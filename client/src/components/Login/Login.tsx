@@ -19,13 +19,13 @@ import LanguagePicker from "../LanguagePicker";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { setToken } = useAuth();
 
   // Do NOT auto-redirect on load; always show login. Redirect only after verify.
 
   const [playerDto, setPlayerDto] = useState<PlayerDto>({});
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
@@ -33,7 +33,7 @@ const Login: React.FC = () => {
 
   //Handle email changes
   const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
+    setErrorKey(null);
     setPlayerDto((prev) => ({
       ...prev,
       email: event.target.value,
@@ -42,10 +42,10 @@ const Login: React.FC = () => {
 
   // Lähetä kertakäyttökoodi sähköpostiin
   const handleSendCode = async () => {
-    setError(null);
+    setErrorKey(null);
     const email = playerDto.email?.trim() || "";
     if (!email || (!email.endsWith("@edu.xamk.fi") && !email.endsWith("@xamk.fi"))) {
-      setError(t("errors.onlySchoolEmails"));
+      setErrorKey("errors.onlySchoolEmails");
       return;
     }
     setIsSending(true);
@@ -86,7 +86,7 @@ const Login: React.FC = () => {
       setCodeSent(true);
       enqueueSnackbar(t("notify.codeSent"), { variant: "success", autoHideDuration: 4000 });
     } catch (e: any) {
-      setError(t("errors.generic"));
+      setErrorKey("errors.generic");
       enqueueSnackbar(t("notify.sendFailed"), { variant: "error", autoHideDuration: 5000 });
     } finally {
       setIsSending(false);
@@ -95,10 +95,10 @@ const Login: React.FC = () => {
 
   // Vahvista koodi ja kirjaudu sisään
   const handleVerifyCode = async () => {
-    setError(null);
+    setErrorKey(null);
     const email = playerDto.email?.trim() || "";
     if (!email || !code.trim()) {
-      setError(t("errors.generic"));
+      setErrorKey("errors.generic");
       return;
     }
     setIsVerifying(true);
@@ -138,7 +138,7 @@ const Login: React.FC = () => {
         navigate(isAdmin ? "/admin" : "/profile");
       }
     } catch (e: any) {
-      setError(t("errors.generic"));
+      setErrorKey("errors.generic");
       enqueueSnackbar(t("notify.verifyFailed"), { variant: "error", autoHideDuration: 5000 });
     } finally {
       setIsVerifying(false);
@@ -182,9 +182,9 @@ const Login: React.FC = () => {
             />
           )}
 
-          {error && (
+          {errorKey && (
             <Typography color="error" variant="body1" sx={{ mt: 1 }}>
-              {error}
+              {t(errorKey)}
             </Typography>
           )}
 

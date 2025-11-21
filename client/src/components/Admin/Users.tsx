@@ -177,10 +177,24 @@ const AdminUsers = () => {
         />
       </Paper>
 
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t("common.confirmDeletion")}</DialogTitle>
         <DialogContent>
-          {t("admin.users.confirmDeleteBody", { count: selectedEmails.length })}
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {t("admin.users.confirmDeleteBody", { count: selectedEmails.length })}
+          </Typography>
+          {selectedEmails.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflow: "auto" }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+                {t("common.email")}:
+              </Typography>
+              {selectedEmails.map((email) => (
+                <Typography key={email} variant="body2" sx={{ py: 0.5, pl: 2 }}>
+                  • {email}
+                </Typography>
+              ))}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>{t("common.cancel")}</Button>
