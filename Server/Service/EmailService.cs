@@ -121,12 +121,12 @@ namespace gameroombookingsys.Helpers
                 try
                 {
                     await SendEmailViaAzureCommunicationServicesAsync(to, subject, htmlContent);
-                    _logger?.LogInformation("Login code email sent successfully via Azure Communication Services to {Email} in language {Language}", to, language);
+                    _logger.LogInformation("Login code email sent successfully via Azure Communication Services to {Email} in language {Language}", to, language);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Failed to send email via Azure Communication Services to {Email}, falling back to console output", to);
+                    _logger.LogError(ex, "Failed to send email via Azure Communication Services to {Email}, falling back to console output", to);
                     // Fall through to console logging
                 }
             }
