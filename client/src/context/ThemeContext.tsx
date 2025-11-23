@@ -27,9 +27,9 @@ interface ThemeContextProviderProps {
 
 export const ThemeContextProvider: React.FC<ThemeContextProviderProps> = ({ children }) => {
   const [mode, setMode] = useState<ThemeMode>(() => {
-    // Load theme from localStorage or default to light
+    // Load theme from localStorage or default to dark
     const savedTheme = localStorage.getItem('themeMode') as ThemeMode;
-    return savedTheme || 'light';
+    return savedTheme || 'dark';
   });
 
   useEffect(() => {
