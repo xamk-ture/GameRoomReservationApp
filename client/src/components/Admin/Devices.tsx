@@ -252,8 +252,10 @@ const AdminDevices = () => {
                         </Box>
                       </TableCell>
                       <TableCell align="right">
-                        <Button size="small" sx={{ mr: 1 }} variant="outlined" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
-                        <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d)}>{t("common.delete")}</Button>
+                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                          <Button size="small" variant="outlined" onClick={() => openEdit(d)}>{t("common.edit")}</Button>
+                          <Button size="small" color="error" variant="outlined" onClick={() => handleDelete(d)}>{t("common.delete")}</Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );

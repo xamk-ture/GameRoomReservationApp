@@ -582,21 +582,22 @@ const AdminBookings = () => {
                         {(booking.devices || []).map(d => d.name).join(", ") || "-"}
                       </TableCell>
                       <TableCell align="right">
-                        <Button 
-                          size="small" 
-                          sx={{ mr: 1 }} 
-                          variant="outlined" 
-                          onClick={() => openEdit(booking)}
-                          disabled={(() => {
-                            const now = dayjs();
-                            const bookingStart = dayjs(booking.bookingDateTime as any);
-                            const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
-                            return bookingStart.isBefore(now) && bookingEnd.isAfter(now);
-                          })()}
-                        >
-                          {t("common.edit")}
-                        </Button>
-                        <Button size="small" color="error" variant="contained" onClick={() => handleDelete(booking)}>{t("common.delete")}</Button>
+                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            onClick={() => openEdit(booking)}
+                            disabled={(() => {
+                              const now = dayjs();
+                              const bookingStart = dayjs(booking.bookingDateTime as any);
+                              const bookingEnd = bookingStart.add(booking.duration || 0, 'hour');
+                              return bookingStart.isBefore(now) && bookingEnd.isAfter(now);
+                            })()}
+                          >
+                            {t("common.edit")}
+                          </Button>
+                          <Button size="small" color="error" variant="contained" onClick={() => handleDelete(booking)}>{t("common.delete")}</Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
