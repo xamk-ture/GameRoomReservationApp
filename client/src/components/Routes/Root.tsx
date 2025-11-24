@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import Navigation from "../SideNav/Navigation";
 import { Box, IconButton, AppBar, Toolbar, useTheme, useMediaQuery } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -6,15 +6,27 @@ import LoaderBackdrop from "../LoaderBackDrop";
 import LanguagePicker from "../LanguagePicker";
 import { useState } from "react";
 import { useThemeMode } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthProvider";
+import AppTitle from "../../assets/APP-TITLE.svg";
 
 const Root = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
   const { mode } = useThemeMode();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { isAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleHomeClick = () => {
+    if (isAdmin) {
+      navigate("/admin/dashboard");
+    } else {
+      navigate("/profile");
+    }
   };
 
   const stylesObj = styles(mode);
@@ -33,6 +45,14 @@ const Root = () => {
             >
               <MenuIcon />
             </IconButton>
+            <IconButton
+              color="inherit"
+              aria-label={isAdmin ? "go to admin dashboard" : "go to profile"}
+              onClick={handleHomeClick}
+              sx={stylesObj.homeButtonMobile}
+            >
+              <img src={AppTitle} alt="Home" style={{ width: 120, height: 28 }} />
+            </IconButton>
             <Box sx={stylesObj.topBarMobile}>
               <LanguagePicker />
             </Box>
@@ -49,6 +69,14 @@ const Root = () => {
               <Outlet />
             </Box>
             <Box sx={stylesObj.topBar}>
+              <IconButton
+                color="inherit"
+                aria-label={isAdmin ? "go to admin dashboard" : "go to profile"}
+                onClick={handleHomeClick}
+                sx={stylesObj.homeButtonDesktop}
+              >
+                <img src={AppTitle} alt="Home" style={{ width: 120, height: 28 }} />
+              </IconButton>
               <LanguagePicker />
             </Box>
           </Box>
@@ -81,7 +109,15 @@ const styles = (mode: 'light' | 'dark') => ({
     paddingRight: { xs: 2, sm: 3 },
   },
   menuButton: {
-    marginRight: 2,
+    marginRight: 1,
+  },
+  homeButtonMobile: {
+    color: '#000',
+    marginRight: 1,
+  },
+  homeButtonDesktop: {
+    color: mode === 'dark' ? '#fff' : '#000',
+    marginRight: 1,
   },
   toolbarSpacer: {
     minHeight: { xs: 64, md: 0 },
@@ -107,6 +143,7 @@ const styles = (mode: 'light' | 'dark') => ({
   topBar: {
     display: { xs: "none", md: "flex" },
     justifyContent: "flex-end",
+    alignItems: "center",
     mb: 0,
     mt: 0,
   },
