@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using gameroombookingsys.IService;
+using gameroombookingsys.Workers;
 using Npgsql;
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -127,6 +128,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<KeycloakHelper>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<gameroombookingsys.IService.IAuthService, gameroombookingsys.Service.AuthService>();
+
+builder.Services.AddHostedService<ExpiredCodesCleanupWorker>();
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
