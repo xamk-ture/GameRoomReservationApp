@@ -142,6 +142,19 @@ The Vite dev server starts on `http://localhost:5173` and proxies `/api` request
 - **Automatic EF Core migrations** on startup (configurable)
 - **Background workers** for expired login code cleanup
 
+## Authentication & Local Login
+
+The app uses **passwordless authentication**. Users enter their XAMK email address (`@xamk.fi` or `@edu.xamk.fi`) and receive a 6-digit one-time code to log in.
+
+- **In production**, login codes are sent via **Azure Communication Services**.
+- **In local development**, Azure Communication Services is not configured, so the code is **not delivered by email**. Instead it is available in two places:
+  1. **Browser DevTools console** (F12) &mdash; look for `[DEV] One-time login code (body): XXXXXX`
+  2. **Server terminal / Docker logs** &mdash; look for `LOGIN CODE FOR: ... CODE: XXXXXX`
+
+Copy the 6-digit code from either location and paste it into the verification field to complete login.
+
+> **Admin access:** Emails listed in `Admin:AllowedEmails` (in `appsettings.json`) are automatically granted the Admin role in the JWT.
+
 ## Configuration
 
 Key settings in `Server/appsettings.json`:
@@ -149,8 +162,10 @@ Key settings in `Server/appsettings.json`:
 | Setting | Description |
 |---------|-------------|
 | `ConnectionStrings:PostgresConnection` | PostgreSQL connection string |
+| `ConnectionStrings:CommunicationConnection` | Azure Communication Services connection string (production email) |
+| `EmailSettings:SenderAddress` | Sender address for Azure Communication Services |
 | `Admin:AllowedEmails` | Email addresses granted the Admin role |
-| `Smtp:*` | SMTP settings for sending login code emails |
+| `Smtp:*` | SMTP settings for booking confirmation emails |
 | `EF:MigrateOnStartup` | Run EF migrations on startup (default: `true`) |
 | `CORS:AllowedOrigins` | Semicolon-separated allowed origins |
 
