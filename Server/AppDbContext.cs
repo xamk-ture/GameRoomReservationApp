@@ -12,19 +12,25 @@ namespace gameroombookingsys
         public DbSet<Player> Players { get; set; }
         public DbSet<Device> Devices { get; set; }
         public DbSet<RoomBooking> RoomBookings { get; set; }
+        public DbSet<OneTimeLoginCode> OneTimeLoginCodes { get; set; }
+        public DbSet<AuthUser> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // Apply IEntityTypeConfiguration<> from this assembly
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
             modelBuilder.Entity<RoomBooking>(entity =>
             {
+                // PostgreSQL: map datetime to timestamp without time zone
                 entity.Property(e => e.BookingDateTime)
-               .HasColumnType("datetime2");
+                    .HasColumnType("timestamp without time zone");
 
-                // Update Duration column to be a float (SQL Server float corresponds to a C# double)
+                // PostgreSQL float8 = double precision
                 entity.Property(e => e.Duration)
-                    .HasColumnType("float");
+                    .HasColumnType("double precision");
             });
 
             modelBuilder.Entity<RoomBooking>()
@@ -53,6 +59,14 @@ namespace gameroombookingsys
                         .HasConstraintName("FK_DeviceRoomBooking_RoomBookings_RoomBookingId")
                         .OnDelete(DeleteBehavior.Cascade) 
                 );
+
+            modelBuilder.Entity<OneTimeLoginCode>(entity =>
+            {
+                entity.HasIndex(e => e.Email);
+                entity.Property(e => e.Email).IsRequired();
+                entity.Property(e => e.Code).IsRequired();
+                entity.Property(e => e.ExpiresAt).HasColumnType("timestamp with time zone");
+            });
         }
     }
 }

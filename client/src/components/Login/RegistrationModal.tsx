@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Button, Modal, TextField, Typography } from "@mui/material";
 import AppTitleColored from "../../assets/APP-TITLE-COLORED.svg";
+import { useTranslation } from "react-i18next";
 
 interface RegistrationModalProps {
   open: boolean;
@@ -13,21 +14,26 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
   onClose,
   onSend,
 }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [errorParams, setErrorParams] = useState<Record<string, any> | null>(null);
 
   const handleSend = async () => {
     if (!email.endsWith("@edu.xamk.fi")) {
-      setError("Please enter a valid university email (@edu.xamk.fi).");
+      setErrorKey("errors.invalidUniversityEmail");
+      setErrorParams(null);
       return;
     }
     try {
       await onSend(email);
       setEmail("");
-      setError("");
+      setErrorKey(null);
+      setErrorParams(null);
       onClose();
     } catch (e: any) {
-      setError("Error sending registration email: " + (e.message || e));
+      setErrorKey("errors.registrationEmailFailed");
+      setErrorParams({ error: e.message || e });
     }
   };
 
@@ -43,35 +49,53 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       <Box sx={styles.wrapper}>
         <Box sx={styles.titleAndLogo}>
           <Typography variant="h5" sx={styles.title}>
-            Register in
+            {t("registration.title")}
           </Typography>
           <img src={AppTitleColored} alt="X Game Room" width={200} />
         </Box>
 
         <Box flex={1}>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            Enter your university email to receive a registration link
+            {t("registration.emailPrompt")}
           </Typography>
           <TextField
-            label="Email"
+            label={t("common.email")}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             fullWidth
             margin="normal"
           />
-          {error && (
+          {errorKey && (
             <Typography color="error" variant="body2">
-              {error}
+              {errorParams ? t(errorKey, errorParams) : t(errorKey)}
             </Typography>
           )}
         </Box>
         <Box sx={styles.buttons}>
-          <Button variant="contained" onClick={handleSend}>
-            Send
+          <Button
+            variant="contained"
+            onClick={handleSend}
+            sx={{
+              backgroundColor: "#ffaa00",
+              color: "#000",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(255, 170, 0, 0.4), 0 0 20px rgba(255, 170, 0, 0.2)",
+              "&:hover": {
+                backgroundColor: "#e69900",
+                boxShadow: "0 6px 20px rgba(255, 170, 0, 0.5), 0 0 25px rgba(255, 170, 0, 0.3)",
+                transform: "translateY(-1px)",
+              },
+              "&:active": {
+                transform: "translateY(0)",
+              },
+              transition: "all 0.3s ease",
+            }}
+          >
+            {t("registration.send")}
           </Button>
           <Button variant="outlined" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         </Box>
       </Box>

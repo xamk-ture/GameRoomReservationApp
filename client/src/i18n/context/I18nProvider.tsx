@@ -51,7 +51,7 @@ i18n
   .use(BrowserLanguageDetector)
   .use(backend)
   .init({
-    debug: true,
+    debug: false,
     lng: localStorage.getItem("lang") || "fi",
     fallbackLng: "fi",
     supportedLngs: Object.keys(locales),

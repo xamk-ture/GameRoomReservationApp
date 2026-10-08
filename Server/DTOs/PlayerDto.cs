@@ -2,7 +2,7 @@
 
 namespace gameroombookingsys.DTOs
 {
-    public class PlayerDto : BaseEntity
+    public class PlayerDto
     {
         public PlayerDto() { } // parameterless constructor for deserialization
 
@@ -10,16 +10,14 @@ namespace gameroombookingsys.DTOs
         public PlayerDto(Player player)
         {
             Id = player.Id;
-            Username = player.Username;
-            PictureUrl = player.PictureUrl;
-            PhoneNumber = player.PhoneNumber;
+            CreatedAt = player.CreatedAt;
+            UpdatedAt = player.UpdatedAt;
             Email = player.Email;
-            Theme = player.Theme;
-        } 
-        public string Username { get; set; }
-        public string PictureUrl { get; set; }
-        public string PhoneNumber { get; set; }
+        }
+
+        public int Id { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
         public string Email { get; set; }
-        public string Theme { get; set; }
     }
 }

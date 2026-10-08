@@ -2,6 +2,7 @@
 using gameroombookingsys.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.AspNetCore.Authorization;
 
 namespace gameroombookingsys.Controllers
 {
@@ -18,6 +19,7 @@ namespace gameroombookingsys.Controllers
 
         // POST api/devices
         [HttpPost("adddevice")]
+        [Authorize(Policy = "Admin")]
         [ProducesResponseType(typeof(DeviceDto), StatusCodes.Status200OK)]
         [SwaggerOperation(OperationId = "AddDevice")]
         public async Task<ActionResult<DeviceDto>> AddDevice([FromBody] DeviceDto deviceDto)
@@ -35,6 +37,7 @@ namespace gameroombookingsys.Controllers
 
         // PUT api/devices/{id}
         [HttpPut("device/{id}")]
+        [Authorize(Policy = "Admin")]
         [ProducesResponseType(typeof(DeviceDto), StatusCodes.Status200OK)]
         [SwaggerOperation(OperationId = "UpdateDevice")]
         public async Task<ActionResult<DeviceDto>> UpdateDevice(int id, [FromBody] DeviceDto deviceDto)
@@ -57,6 +60,7 @@ namespace gameroombookingsys.Controllers
 
         // DELETE api/devices/{id}
         [HttpDelete("device/{id}")]
+        [Authorize(Policy = "Admin")]
         [ProducesResponseType(typeof(DeviceDto), StatusCodes.Status200OK)]
         [SwaggerOperation(OperationId = "DeleteDevice")]
         public async Task<ActionResult<DeviceDto>> DeleteDevice(int id)

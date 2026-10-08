@@ -5,11 +5,6 @@ export interface Locale {
 }
 
 const locales: { [lng: string]: Locale } = {
-  ar: {
-    nativeName: "العربية",
-    englishName: "Arabic",
-    rtl: true,
-  },
   en: {
     nativeName: "English",
     englishName: "English",

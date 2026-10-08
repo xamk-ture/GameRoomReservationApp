@@ -5,24 +5,15 @@ import {
   RadioGroup,
   Typography,
 } from "@mui/material";
-import { useColorScheme } from "@mui/material/styles";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../api/api";
 import { usePlayerInfo } from "../hooks/usePlayerInfo";
 
 export const AppThemeSwitch = () => {
-  // MUI color scheme hook
-  const { mode, setMode } = useColorScheme();
-
   const { playerInfo } = usePlayerInfo();
 
   // Local state for the radio buttons (light/dark)
   const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    // Initialize local theme from MUI color scheme
-    setCurrentTheme(mode === "dark" ? "dark" : "light");
-  }, [mode]);
 
   const handleThemeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newTheme = event.target.value as "light" | "dark";
@@ -30,10 +21,10 @@ export const AppThemeSwitch = () => {
     // 1) Update local radio state
     setCurrentTheme(newTheme);
 
-    // 2) Update MUI color scheme
-    setMode(newTheme);
+    // 2) Update document theme class for CSS
+    document.documentElement.setAttribute('data-theme', newTheme);
 
-    // 3) Persist theme to backend if you have the player’s ID
+    // 3) Persist theme to backend if you have the player's ID
     if (playerInfo && playerInfo.id) {
       api.PlayersService.updatePlayerInfoById(playerInfo.id, {
         ...playerInfo,

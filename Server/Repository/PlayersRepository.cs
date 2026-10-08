@@ -41,12 +41,6 @@ namespace Gameroombookingsys.Repository
             return playerByEmail;
         }
 
-        public async Task<Player> GetPlayerByUsername(string username)
-        {
-            var playerByUserName = await _context.Players.FirstOrDefaultAsync(p => p.Username == username);
-            return playerByUserName;
-        }
-
         public async Task<List<Player>> GetAllPlayers()
         {
             var players = await _context.Players.ToListAsync();
@@ -64,6 +58,21 @@ namespace Gameroombookingsys.Repository
             {
                 _logger.LogError(ex, "Error updating player in repository.");
                 throw new Exception("Error updating player in repository.", ex);
+            }
+        }
+
+        public async Task<Player> AddPlayer(Player player)
+        {
+            try
+            {
+                _context.Players.Add(player);
+                await _context.SaveChangesAsync();
+                return player;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding player in repository.");
+                throw new Exception("Error adding player in repository.", ex);
             }
         }
 

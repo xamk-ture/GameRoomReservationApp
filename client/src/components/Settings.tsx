@@ -1,15 +1,28 @@
-import { AppThemeSwitch } from "./AppThemeSwitch";
-import { Box, Typography } from "@mui/material";
-import LanguagePicker from "./LanguagePicker";
+import { Box, Typography, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { useThemeMode } from "../context/ThemeContext";
 
 const Settings = () => {
   const { t } = useTranslation();
+  const { mode, setTheme } = useThemeMode();
+
   return (
     <Box sx={styles.container}>
       <Typography sx={styles.title}>{t("Settings")}</Typography>
-      <LanguagePicker />
-      <AppThemeSwitch />
+      
+      <FormControl sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {t("settings.theme", "Theme")}
+        </Typography>
+        <RadioGroup
+          row
+          value={mode}
+          onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
+        >
+          <FormControlLabel value="light" control={<Radio />} label={t("settings.light", "Light")} />
+          <FormControlLabel value="dark" control={<Radio />} label={t("settings.dark", "Dark")} />
+        </RadioGroup>
+      </FormControl>
     </Box>
   );
 };
@@ -20,12 +33,12 @@ const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
-    padding: 2,
+    padding: { xs: 1, md: 2 },
   },
   title: {
     fontWeight: "bold",
     textTransform: "uppercase",
-    fontSize: 32,
+    fontSize: { xs: 24, md: 32 },
     letterSpacing: 1,
     marginBottom: 4,
   },
